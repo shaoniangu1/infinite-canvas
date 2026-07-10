@@ -2,6 +2,8 @@
 
 ## Unreleased
 
++ [新增] KIE 内置模型目录新增 `kling-2.6/motion-control`。
++ [新增] 模型渠道新增前端 Provider Adapter 架构，支持 Alibbit 与 KIE 异步媒体任务接入，并保留原有渠道拉取模型交互。
 + [优化] 本地 Agent 连接说明明确区分插件 / 手动 MCP 才会增加 Codex token 消耗，直接运行 Agent 不受影响。
 + [优化] 优化本地 Agent 连接说明，区分 Codex 插件启动和直接运行 Agent 两种方式。
 + [新增] Agent 对话消息改用 streamdown 流式渲染，提升长回复与 Markdown 内容展示效果。

@@ -6,6 +6,9 @@ import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
+import { builtinModelsForProvider } from "@/services/ai/model-profiles";
+import { requestAlibbitImages } from "@/services/ai/providers/alibbit-provider";
+import { requestKieImages } from "@/services/ai/providers/kie-provider";
 
 export type AiTextMessage = {
     role: "system" | "user" | "assistant";
@@ -651,6 +654,8 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
 export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
+    if (requestConfig.apiFormat === "alibbit") return requestAlibbitImages(requestConfig, withSystemPrompt(requestConfig, prompt), [], n, options);
+    if (requestConfig.apiFormat === "kie") return requestKieImages(requestConfig, withSystemPrompt(requestConfig, prompt), [], n, options);
     if (requestConfig.apiFormat === "gemini") {
         try {
             return await requestGeminiImages(requestConfig, prompt, [], n, options);
@@ -688,6 +693,11 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);
+    if (requestConfig.apiFormat === "alibbit") return requestAlibbitImages(requestConfig, withSystemPrompt(requestConfig, requestPrompt), references, n, options);
+    if (requestConfig.apiFormat === "kie") {
+        if (mask) throw new Error("KIE 调用格式暂不支持蒙版编辑");
+        return requestKieImages(requestConfig, withSystemPrompt(requestConfig, requestPrompt), references, n, options);
+    }
     if (requestConfig.apiFormat === "gemini") {
         if (mask) throw new Error("Gemini 调用格式暂不支持蒙版编辑");
         try {
@@ -744,6 +754,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
 
 export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat">) {
     try {
+        if (config.apiFormat === "alibbit" || config.apiFormat === "kie") return builtinModelsForProvider(config.apiFormat);
         if (config.apiFormat === "gemini") {
             const response = await axios.get<GeminiPayload>(geminiApiUrl({ ...defaultGeminiConfig, ...config }), { headers: geminiHeaders({ ...defaultGeminiConfig, ...config }) });
             validateGeminiPayload(response.data);

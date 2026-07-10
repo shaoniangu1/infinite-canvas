@@ -3,7 +3,9 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 
-export type ApiCallFormat = "openai" | "gemini";
+import { getBuiltinModelProfile } from "@/services/ai/model-profiles";
+
+export type ApiCallFormat = "openai" | "gemini" | "alibbit" | "kie";
 
 export type ModelChannel = {
     id: string;
@@ -59,6 +61,8 @@ export type ModelCapability = "image" | "video" | "text" | "audio";
 const CHANNEL_MODEL_SEPARATOR = "::";
 const OPENAI_BASE_URL = "https://api.openai.com";
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
+const ALIBBIT_BASE_URL = "https://api.catking.top";
+const KIE_BASE_URL = "https://api.kie.ai";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
@@ -143,6 +147,8 @@ function isTextModelName(model: string) {
 
 export function modelMatchesCapability(model: string, capability?: ModelCapability) {
     if (!capability) return true;
+    const profile = getBuiltinModelProfile(modelOptionName(model));
+    if (profile) return profile.capabilities.includes(capability);
     if (capability === "image") return isImageModelName(model);
     if (capability === "video") return isVideoModelName(model);
     if (capability === "audio") return isAudioModelName(model);
@@ -354,11 +360,14 @@ function normalizeChannels(config: AiConfig) {
 }
 
 export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
-    return apiFormat === "gemini" ? GEMINI_BASE_URL : OPENAI_BASE_URL;
+    if (apiFormat === "gemini") return GEMINI_BASE_URL;
+    if (apiFormat === "alibbit") return ALIBBIT_BASE_URL;
+    if (apiFormat === "kie") return KIE_BASE_URL;
+    return OPENAI_BASE_URL;
 }
 
 function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {
-    return apiFormat === "gemini" ? "gemini" : "openai";
+    return apiFormat === "gemini" || apiFormat === "alibbit" || apiFormat === "kie" ? apiFormat : "openai";
 }
 
 function uniqueRawModels(models: string[]) {

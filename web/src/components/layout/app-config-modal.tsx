@@ -36,6 +36,8 @@ const modelGroups: ModelGroup[] = [
 const apiFormatOptions: Array<{ label: string; value: ApiCallFormat }> = [
     { label: "OpenAI", value: "openai" },
     { label: "Gemini", value: "gemini" },
+    { label: "Alibbit", value: "alibbit" },
+    { label: "KIE", value: "kie" },
 ];
 
 const webdavDomainKeys: AppSyncDomainKey[] = ["canvas", "assets", "image-workbench", "video-workbench"];
@@ -130,8 +132,8 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     };
 
     const refreshChannelModels = async (channel: ModelChannel) => {
-        if (!channel.baseUrl.trim() || !channel.apiKey.trim()) {
-            message.error("请先填写该渠道的 Base URL 和 API Key");
+        if (!channel.baseUrl.trim() || (!usesBuiltinModelCatalog(channel) && !channel.apiKey.trim())) {
+            message.error(usesBuiltinModelCatalog(channel) ? "请先填写该渠道的 Base URL" : "请先填写该渠道的 Base URL 和 API Key");
             return;
         }
         setLoadingChannelId(channel.id);
@@ -147,9 +149,9 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     };
 
     const refreshAllModels = async () => {
-        const runnable = config.channels.filter((channel) => channel.baseUrl.trim() && channel.apiKey.trim());
+        const runnable = config.channels.filter((channel) => channel.baseUrl.trim() && (usesBuiltinModelCatalog(channel) || channel.apiKey.trim()));
         if (!runnable.length) {
-            message.error("请先填写至少一个渠道的 Base URL 和 API Key");
+            message.error("请先填写至少一个可拉取模型的渠道配置");
             return;
         }
         setLoadingChannelId("all");
@@ -565,7 +567,14 @@ function uniqueModels(models: string[]) {
 }
 
 function apiFormatLabel(apiFormat: ApiCallFormat) {
-    return apiFormat === "gemini" ? "Gemini" : "OpenAI";
+    if (apiFormat === "gemini") return "Gemini";
+    if (apiFormat === "alibbit") return "Alibbit";
+    if (apiFormat === "kie") return "KIE";
+    return "OpenAI";
+}
+
+function usesBuiltinModelCatalog(channel: ModelChannel) {
+    return channel.apiFormat === "alibbit" || channel.apiFormat === "kie";
 }
 
 function formatWebdavTime(value: string) {
