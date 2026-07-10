@@ -168,7 +168,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     };
 
     const updateCapabilityModels = (group: ModelGroup, models: string[]) => {
-        const next = uniqueModels(models.map((model) => normalizeModelOptionValue(model, config.channels)).filter(Boolean));
+        const next = filterModelsByCapability(uniqueModels(models.map((model) => normalizeModelOptionValue(model, config.channels)).filter(Boolean)), group.capability);
         updateConfig(group.modelsKey, next);
         if (!next.includes(config[group.modelKey])) updateConfig(group.modelKey, next[0] || "");
     };
@@ -525,10 +525,10 @@ export function AppConfigModal() {
 
 function withChannels(config: AiConfig, channels: ModelChannel[]): AiConfig {
     const models = modelOptionsFromChannels(channels);
-    const imageModels = keepOrSuggest(config.imageModels, filterModelsByCapability(models, "image"), models);
-    const videoModels = keepOrSuggest(config.videoModels, filterModelsByCapability(models, "video"), models);
-    const textModels = keepOrSuggest(config.textModels, filterModelsByCapability(models, "text"), models);
-    const audioModels = keepOrSuggest(config.audioModels, filterModelsByCapability(models, "audio"), models);
+    const imageModels = keepOrSuggest(config.imageModels, filterModelsByCapability(models, "image"));
+    const videoModels = keepOrSuggest(config.videoModels, filterModelsByCapability(models, "video"));
+    const textModels = keepOrSuggest(config.textModels, filterModelsByCapability(models, "text"));
+    const audioModels = keepOrSuggest(config.audioModels, filterModelsByCapability(models, "audio"));
     return {
         ...config,
         channels,
@@ -547,8 +547,8 @@ function withChannels(config: AiConfig, channels: ModelChannel[]): AiConfig {
     };
 }
 
-function keepOrSuggest(current: string[], suggested: string[], allModels: string[]) {
-    const available = new Set(allModels);
+function keepOrSuggest(current: string[], suggested: string[]) {
+    const available = new Set(suggested);
     const kept = uniqueModels(current).filter((model) => available.has(model));
     return kept.length ? kept : suggested;
 }

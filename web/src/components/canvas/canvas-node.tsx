@@ -488,8 +488,8 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
     const textStyle = { fontSize: `${fontSize}px`, lineHeight: `${Math.round(fontSize * 1.65)}px`, color: theme.node.text, boxSizing: "border-box" } as React.CSSProperties;
 
     return (
-        <div className="flex h-full w-full flex-col overflow-hidden pt-8">
-            <button
+        <div className="flex h-full w-full flex-col overflow-hidden pt-4 pb-4" data-canvas-no-zoom>
+            {/* <button
                 type="button"
                 className="absolute right-3 top-3 z-20 inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium opacity-85 backdrop-blur-md transition hover:scale-[1.02] hover:opacity-100"
                 style={{ background: `${theme.toolbar.panel}dd`, borderColor: theme.node.stroke, color: theme.node.text }}
@@ -504,10 +504,11 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
             >
                 <ImageIcon className="size-3.5" />
                 生图
-            </button>
+            </button> */}
             {isEditingContent ? (
                 <CanvasResourceMentionTextarea
                     ref={textareaRef}
+                    data-canvas-no-zoom
                     className="thin-scrollbar block h-full w-full resize-none overflow-y-auto whitespace-pre-wrap break-words border-none bg-transparent pl-4 pr-14 pt-0 pb-4 m-0 font-mono outline-none select-text appearance-none"
                     style={textStyle}
                     value={node.metadata?.content || ""}
@@ -524,7 +525,8 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
                 />
             ) : (
                 <div
-                    className="thin-scrollbar block h-full w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent pl-4 pr-14 pt-0 pb-4 font-mono"
+                    data-canvas-no-zoom
+                    className="thin-scrollbar block h-full w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent pl-4 pr-4 pt-0 pb-4 font-mono"
                     style={textStyle}
                     onWheel={(event) => event.stopPropagation()}
                 >

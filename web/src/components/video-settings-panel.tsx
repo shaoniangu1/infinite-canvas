@@ -5,6 +5,7 @@ import { ImageSettingsTheme } from "@/components/image-settings-panel";
 import { boolConfig, isSeedanceFastModel, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceDurationOptions, seedancePixelLabel, seedanceRatioOptions, seedanceResolutionOptions } from "@/lib/seedance-video";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
+import { getVideoModelProfile, type VideoSettingField } from "@/services/ai/video-model-profiles";
 
 const resolutionOptions = [
     { value: "720", label: "720p" },
@@ -28,13 +29,17 @@ export const videoSecondOptions = secondOptions.map((value) => String(value));
 
 type VideoSettingsPanelProps = {
     config: AiConfig;
-    onConfigChange: (key: "vquality" | "size" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark", value: string) => void;
+    onConfigChange: (key: "vquality" | "size" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark" | "videoMode" | "videoCharacterOrientation" | "videoBackgroundSource", value: string) => void;
     theme: CanvasTheme;
     showTitle?: boolean;
     className?: string;
 };
 
 export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-full space-y-2.5 rounded-2xl px-1 py-0.5" }: VideoSettingsPanelProps) {
+    const profile = getVideoModelProfile(modelOptionName(config.model || config.videoModel), config.apiFormat);
+    if (profile.task === "motion-control") {
+        return <MotionControlVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} fields={profile.fields} />;
+    }
     if (isSeedanceVideoConfig(config)) {
         return <SeedanceVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} />;
     }
@@ -186,6 +191,43 @@ function OptionPill({ selected, disabled = false, theme, onClick, children }: { 
         <button type="button" disabled={disabled} className="h-7 cursor-pointer rounded-md border px-2 text-xs transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-35" style={optionStyle(selected, theme)} onMouseDown={(event) => event.stopPropagation()} onClick={onClick}>
             {children}
         </button>
+    );
+}
+
+function MotionControlVideoSettingsPanel({ config, onConfigChange, theme, showTitle, className, fields }: VideoSettingsPanelProps & { fields: VideoSettingField[] }) {
+    const values: Record<string, string> = {
+        mode: config.videoMode,
+        character_orientation: config.videoCharacterOrientation,
+        background_source: config.videoBackgroundSource,
+    };
+    const keyMap: Record<string, "videoMode" | "videoCharacterOrientation" | "videoBackgroundSource"> = {
+        mode: "videoMode",
+        character_orientation: "videoCharacterOrientation",
+        background_source: "videoBackgroundSource",
+    };
+
+    return (
+        <ImageSettingsTheme theme={theme}>
+            <div className={className} style={{ color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()}>
+                {showTitle ? <div className="text-sm font-semibold">视频设置</div> : null}
+                <div className="rounded-md border p-2 text-[11px] leading-4" style={{ borderColor: theme.node.stroke, color: theme.node.placeholder }}>
+                    该模型需要 1 张人物图片和 1 个动作参考视频，提示词可不填。
+                </div>
+                {fields.map((field) => (
+                    <SettingGroup key={field.key} title={`${field.label}${field.required ? " *" : "（可选）"}`} color={theme.node.muted}>
+                        <div className="grid grid-cols-2 gap-1.5">
+                            {(field.options || []).map((item) => (
+                                <OptionPill key={item.value} selected={values[field.key] === item.value} theme={theme} onClick={() => onConfigChange(keyMap[field.key], item.value)}>
+                                    {item.label}
+                                </OptionPill>
+                            ))}
+                        </div>
+                        {field.required && !values[field.key] ? <div className="text-[10px] leading-4" style={{ color: theme.node.placeholder }}>请选择{field.label}</div> : null}
+                        {field.description ? <div className="text-[10px] leading-4 opacity-55">{field.description}</div> : null}
+                    </SettingGroup>
+                ))}
+            </div>
+        </ImageSettingsTheme>
     );
 }
 

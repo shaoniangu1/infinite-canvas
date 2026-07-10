@@ -9,6 +9,7 @@ import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { resolveProviderAspectRatio } from "../image-settings";
 import { providerHeaders, readProviderError, runAsyncTask, type RequestOptions } from "../media-task-runtime";
+import { buildKieVideoTaskBody } from "./kie-video-payload";
 import type { GeneratedImage } from "./alibbit-provider";
 
 export type GeneratedVideo = { blob?: Blob; url?: string; mimeType?: string };
@@ -62,19 +63,7 @@ export async function requestKieVideo(config: AiConfig, prompt: string, referenc
         const result = await runAsyncTask(
             config,
             kieTaskProfile,
-            {
-                model: config.model,
-                callBackUrl: "",
-                input: {
-                    prompt,
-                    aspect_ratio: normalizeKieAspectRatio(config),
-                    duration: normalizeDuration(config.videoSeconds),
-                    resolution: normalizeResolution(config.vquality),
-                    ...(imageUrls.length ? { image_urls: imageUrls, input_urls: imageUrls } : {}),
-                    ...(videoUrls.length ? { video_urls: videoUrls } : {}),
-                    ...(audioUrls.length ? { audio_urls: audioUrls } : {}),
-                },
-            },
+            buildKieVideoTaskBody(config, prompt, imageUrls, videoUrls, audioUrls),
             options,
         );
         const url = result.urls[0];
@@ -115,14 +104,4 @@ async function uploadKieFile(config: AiConfig, file: File, options?: RequestOpti
 
 function normalizeKieAspectRatio(config: Pick<AiConfig, "quality" | "resolution" | "size">) {
     return resolveProviderAspectRatio(config, ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"]);
-}
-
-function normalizeDuration(value: string) {
-    return Math.max(1, Math.min(20, Math.floor(Number(value) || 6)));
-}
-
-function normalizeResolution(value: string) {
-    if (value === "low") return "480p";
-    if (value === "medium" || value === "high" || value === "auto") return "720p";
-    return value.endsWith("p") ? value : `${value || "720"}p`;
 }

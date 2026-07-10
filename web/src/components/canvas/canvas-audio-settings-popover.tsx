@@ -15,7 +15,7 @@ type CanvasAudioSettingsPopoverProps = {
     config: AiConfig;
     onConfigChange: (key: CanvasAudioSettingKey, value: string) => void;
     buttonClassName?: string;
-    placement?: "topLeft" | "top" | "topRight" | "bottomLeft" | "bottom" | "bottomRight";
+    placement?: "topLeft" | "top" | "topRight" | "bottomLeft" | "bottom" | "bottomRight" | "right";
 };
 
 export function CanvasAudioSettingsPopover({ config, onConfigChange, buttonClassName, placement = "topLeft" }: CanvasAudioSettingsPopoverProps) {
@@ -79,13 +79,14 @@ function AudioSettingsPortal({
 }) {
     const width = 340;
     const height = 460;
-    const gap = 8;
+    const gap = 20;
     const margin = 12;
+    const sidePlacement = placement === "right";
     const alignRight = placement?.endsWith("Right");
     const alignCenter = placement === "top" || placement === "bottom";
-    const left = alignCenter ? buttonRect.left + buttonRect.width / 2 - width / 2 : alignRight ? buttonRect.right - width : buttonRect.left;
+    const left = sidePlacement ? buttonRect.right + gap : alignCenter ? buttonRect.left + buttonRect.width / 2 - width / 2 : alignRight ? buttonRect.right - width : buttonRect.left;
     const requestedTopPlacement = placement?.startsWith("top");
-    const preferredTop = requestedTopPlacement ? buttonRect.top - height - gap : buttonRect.bottom + gap;
+    const preferredTop = sidePlacement ? buttonRect.top + buttonRect.height / 2 - height / 2 : requestedTopPlacement ? buttonRect.top - height - gap : buttonRect.bottom + gap;
     const top = Math.max(margin, Math.min(window.innerHeight - height - margin, preferredTop));
     const style = {
         position: "fixed",

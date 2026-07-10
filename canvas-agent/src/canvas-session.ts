@@ -54,7 +54,9 @@ export class CanvasSession {
     }
 
     emitAll(type: string, payload: unknown) {
-        this.clients.forEach((client) => sendEvent(client, type, payload));
+        this.clients.forEach((client, clientId) => {
+            if (!sendEvent(client, type, payload)) this.clients.delete(clientId);
+        });
     }
 
     async callTool(name: unknown, rawInput: unknown) {
@@ -168,9 +170,13 @@ export class CanvasSession {
 
     private async requestCanvasTool(name: ToolName, input: Record<string, unknown>) {
         const requestId = crypto.randomUUID();
+        this.pruneClients();
         const client = this.clients.get(this.canvasState?.clientId || "") || this.clients.values().next().value;
         if (!client) throw new Error("当前没有已连接画布");
-        sendEvent(client, "tool_call", { requestId, name, input });
+        if (!sendEvent(client, "tool_call", { requestId, name, input })) {
+            this.pruneClients();
+            throw new Error("当前没有已连接画布");
+        }
         return await new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
                 this.pending.delete(requestId);
@@ -179,10 +185,21 @@ export class CanvasSession {
             this.pending.set(requestId, { resolve: (value) => (clearTimeout(timer), resolve(value)), reject: (error) => (clearTimeout(timer), reject(error)) });
         });
     }
+
+    private pruneClients() {
+        this.clients.forEach((client, clientId) => {
+            if (client.destroyed || client.writableEnded) this.clients.delete(clientId);
+        });
+    }
 }
 
 function sendEvent(res: ServerResponse, type: string, payload: unknown) {
-    res.write(`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`);
+    if (res.destroyed || res.writableEnded) return false;
+    try {
+        return res.write(`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`);
+    } catch {
+        return false;
+    }
 }
 
 function textNodeOp(input: { id?: string; text?: string; title?: string; width?: number; height?: number }, x: number, y: number) {
@@ -213,6 +230,9 @@ function configNodeOp(id: string, input: Record<string, unknown>, x: number, y: 
             vquality: input.vquality,
             generateAudio: input.generateAudio,
             watermark: input.watermark,
+            videoMode: input.videoMode,
+            videoCharacterOrientation: input.videoCharacterOrientation,
+            videoBackgroundSource: input.videoBackgroundSource,
             audioVoice: input.audioVoice,
             audioFormat: input.audioFormat,
             audioSpeed: input.audioSpeed,

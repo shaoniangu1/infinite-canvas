@@ -35,6 +35,9 @@ export type AiConfig = {
     vquality: string;
     videoGenerateAudio: string;
     videoWatermark: string;
+    videoMode: string;
+    videoCharacterOrientation: string;
+    videoBackgroundSource: string;
     systemPrompt: string;
     models: string[];
     imageModels: string[];
@@ -93,6 +96,9 @@ export const defaultConfig: AiConfig = {
     vquality: "720",
     videoGenerateAudio: "true",
     videoWatermark: "false",
+    videoMode: "",
+    videoCharacterOrientation: "",
+    videoBackgroundSource: "",
     systemPrompt: "",
     models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
     imageModels: ["default::gpt-image-2"],
@@ -103,7 +109,7 @@ export const defaultConfig: AiConfig = {
     resolution: "2k",
     size: "1:1",
     count: "1",
-    canvasImageCount: "3",
+    canvasImageCount: "1",
 };
 
 export const defaultWebdavSyncConfig: WebdavSyncConfig = {
@@ -163,7 +169,7 @@ export function filterModelsByCapability(models: string[], capability?: ModelCap
 
 export function selectableModelsByCapability(config: AiConfig, capability?: ModelCapability) {
     if (!capability) return config.models;
-    return config[modelListKey(capability)];
+    return filterModelsByCapability(config[modelListKey(capability)], capability);
 }
 
 function modelListKey(capability: ModelCapability) {
@@ -237,7 +243,7 @@ export const useConfigStore = create<ConfigStore>()(
                         quality: config.quality || defaultConfig.quality,
                         resolution: config.resolution || defaultConfig.resolution,
                         size: config.size || defaultConfig.size,
-                        canvasImageCount: config.canvasImageCount || "3",
+                        canvasImageCount: config.canvasImageCount || defaultConfig.canvasImageCount,
                         imageModels: Array.isArray(persistedConfig.imageModels) ? normalizeModelList(config.imageModels, channels) : filterModelsByCapability(models, "image"),
                         videoModels: Array.isArray(persistedConfig.videoModels) ? normalizeModelList(config.videoModels, channels) : filterModelsByCapability(models, "video"),
                         textModels: Array.isArray(persistedConfig.textModels) ? normalizeModelList(config.textModels, channels) : filterModelsByCapability(models, "text"),
