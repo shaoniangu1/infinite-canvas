@@ -7,6 +7,7 @@ import { imageToDataUrl } from "@/services/image-storage";
 import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
+import { resolveProviderAspectRatio } from "../image-settings";
 import { providerHeaders, readProviderError, runAsyncTask, type RequestOptions } from "../media-task-runtime";
 import type { GeneratedImage } from "./alibbit-provider";
 
@@ -38,7 +39,7 @@ export async function requestKieImages(config: AiConfig, prompt: string, referen
                 callBackUrl: "",
                 input: {
                     prompt,
-                    aspect_ratio: normalizeAspectRatio(config.size),
+                    aspect_ratio: normalizeKieAspectRatio(config),
                     count,
                     ...(imageUrls.length ? { image_urls: imageUrls } : {}),
                 },
@@ -66,7 +67,7 @@ export async function requestKieVideo(config: AiConfig, prompt: string, referenc
                 callBackUrl: "",
                 input: {
                     prompt,
-                    aspect_ratio: normalizeAspectRatio(config.size),
+                    aspect_ratio: normalizeKieAspectRatio(config),
                     duration: normalizeDuration(config.videoSeconds),
                     resolution: normalizeResolution(config.vquality),
                     ...(imageUrls.length ? { image_urls: imageUrls, input_urls: imageUrls } : {}),
@@ -112,8 +113,8 @@ async function uploadKieFile(config: AiConfig, file: File, options?: RequestOpti
     return url;
 }
 
-function normalizeAspectRatio(value: string) {
-    return value && value !== "auto" && value.includes(":") ? value : "1:1";
+function normalizeKieAspectRatio(config: Pick<AiConfig, "quality" | "resolution" | "size">) {
+    return resolveProviderAspectRatio(config, ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"]);
 }
 
 function normalizeDuration(value: string) {

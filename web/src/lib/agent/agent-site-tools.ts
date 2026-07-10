@@ -2,7 +2,7 @@ import type { NavigateFunction } from "react-router-dom";
 
 import { fetchPrompts } from "@/services/api/prompts";
 import { uploadImage } from "@/services/image-storage";
-import { imageAspectOptions, imageQualityOptions } from "@/components/image-settings-panel";
+import { imageAspectOptions, imageQualityOptions, imageResolutionOptions } from "@/components/image-settings-panel";
 import { videoResolutionOptions, videoSecondOptions, videoSizeOptions } from "@/components/video-settings-panel";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -86,9 +86,11 @@ function getImageConfig() {
     const { config } = useConfigStore.getState();
     const model = config.imageModel || config.model;
     return {
-        current: { model, modelName: modelOptionName(model), quality: config.quality || "auto", size: config.size || "1:1", count: config.count || "1" },
+        current: { model, modelName: modelOptionName(model), quality: config.quality || "medium", resolution: config.resolution || "2k", aspectRatio: config.size || "1:1", count: config.count || "1" },
         models: config.imageModels.map((value) => ({ value, label: modelOptionLabel(config, value) })),
         qualityOptions: imageQualityOptions,
+        resolutionOptions: imageResolutionOptions,
+        aspectRatioOptions: imageAspectOptions,
         sizeOptions: imageAspectOptions,
         countRange: { min: 1, max: 15 },
     };
@@ -105,6 +107,14 @@ function runImageWorkbench(input: SiteToolInput, navigate: NavigateFunction) {
     if (typeof input.quality === "string" && input.quality.trim()) {
         configStore.updateConfig("quality", input.quality);
         applied.quality = input.quality;
+    }
+    if (typeof input.resolution === "string" && input.resolution.trim()) {
+        configStore.updateConfig("resolution", input.resolution);
+        applied.resolution = input.resolution;
+    }
+    if (typeof input.aspectRatio === "string" && input.aspectRatio.trim()) {
+        configStore.updateConfig("size", input.aspectRatio);
+        applied.aspectRatio = input.aspectRatio;
     }
     if (typeof input.size === "string" && input.size.trim()) {
         configStore.updateConfig("size", input.size);

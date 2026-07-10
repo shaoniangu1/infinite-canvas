@@ -32,7 +32,7 @@ export const canvasThemes = {
     },
     dark: {
         canvas: {
-            background: "#181715",
+            background: "#141414",
             dot: "rgba(245,245,244,.24)",
             line: "rgba(245,245,244,.10)",
             selectionStroke: "#fafaf9",
@@ -40,9 +40,9 @@ export const canvasThemes = {
         },
         node: {
             label: "#d6d3d1",
-            fill: "#292524",
+            fill: "#252525",
             panel: "#1f1d1a",
-            stroke: "#44403c",
+            stroke: "#525252",
             activeStroke: "#fafaf9",
             placeholder: "#a8a29e",
             text: "#f5f5f4",
@@ -50,11 +50,11 @@ export const canvasThemes = {
             faint: "#78716c",
         },
         toolbar: {
-            panel: "rgba(31,29,26,.96)",
+            panel: "#252525",
             border: "#44403c",
             item: "#d6d3d1",
             itemHover: "#292524",
-            activeBg: "#3a3631",
+            activeBg: "#ffffff1a",
             activeText: "#f5f5f4",
         },
     },
