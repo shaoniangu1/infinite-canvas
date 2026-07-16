@@ -47,6 +47,8 @@ const seedanceFields: VideoSettingField[] = [
     { key: "videoWatermark", label: "添加水印", type: "preset" },
 ];
 
+const kieSeedanceFields: VideoSettingField[] = seedanceFields.filter((field) => field.key !== "videoWatermark");
+
 const motionControlBaseFields: VideoSettingField[] = [
     {
         key: "mode",
@@ -100,6 +102,19 @@ export function getVideoModelProfile(model: string, provider: VideoProviderKey |
             fields: isKling30MotionControlModel(normalized) ? kling30MotionControlFields : kling26MotionControlFields,
         };
     }
+    if (isKieSeedanceVideoModel(normalized)) {
+        return {
+            id: normalized,
+            provider: "kie",
+            task: "reference-video",
+            assets: {
+                images: { max: 9, roles: ["reference_image"] },
+                videos: { max: 3, roles: ["reference_video"] },
+                audios: { max: 3, roles: ["reference_audio"] },
+            },
+            fields: kieSeedanceFields,
+        };
+    }
     if (isSeedanceModel(normalized)) {
         return {
             id: normalized,
@@ -128,6 +143,7 @@ export function hasVideoProfileField(profile: VideoModelProfile, key: VideoSetti
 
 export function validateVideoModelInputs(config: VideoModelInputConfig, context: VideoModelValidationContext = {}) {
     const profile = getVideoModelProfile(config.model, "kie");
+    if (profile.provider === "kie" && isKieSeedanceVideoModel(profile.id)) return validateKieSeedanceInputs(context);
     if (profile.task !== "motion-control") return [];
 
     const errors: string[] = [];
@@ -162,12 +178,26 @@ export function isKling30MotionControlModel(model: string) {
     return /^kling-3(?:\.0)?\/motion-control$/i.test(normalizeVideoModelName(model));
 }
 
+export function isKieSeedanceVideoModel(model: string) {
+    return /^bytedance\/seedance-2(?:-(?:fast|mini))?$/i.test(normalizeVideoModelName(model));
+}
+
 export function normalizeVideoModelName(model: string) {
     return (model || "").split("::").pop()?.trim() || "";
 }
 
 function isSeedanceModel(model: string) {
     return /seedance/i.test(model);
+}
+
+function validateKieSeedanceInputs(context: VideoModelValidationContext) {
+    const imageCount = context.imageCount || 0;
+    const videoCount = context.videoCount || 0;
+    const audioCount = context.audioCount || 0;
+    const errors: string[] = [];
+    if (!context.prompt?.trim()) errors.push("KIE Seedance 2 提示词必填");
+    if (audioCount && !imageCount && !videoCount) errors.push("Seedance 参考音频不能单独使用，请同时连接参考图或参考视频");
+    return errors;
 }
 
 function videoFieldValue(config: VideoModelInputConfig, field: VideoSettingField) {

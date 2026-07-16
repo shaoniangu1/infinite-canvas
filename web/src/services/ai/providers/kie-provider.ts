@@ -25,6 +25,7 @@ const kieTaskProfile = {
     failureStatuses: ["fail", "failed", "error"],
     timeoutMessage: "KIE 任务生成超时，请稍后重试",
     pollIntervalMs: 5000,
+    maxAttempts: 360,
 };
 
 const KIE_UPLOAD_URL = "https://kieai.redpandaai.co/api/file-stream-upload";
@@ -37,7 +38,6 @@ export async function requestKieImages(config: AiConfig, prompt: string, referen
             kieTaskProfile,
             {
                 model: config.model,
-                callBackUrl: "",
                 input: {
                     prompt,
                     aspect_ratio: normalizeKieAspectRatio(config),

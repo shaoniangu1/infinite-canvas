@@ -6,7 +6,7 @@ import { Button } from "antd";
 import { VideoSettingsPanel, videoResolutionLabel, videoSecondsLabel, videoSizeLabel } from "@/components/video-settings-panel";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
+import { modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import { getVideoModelProfile } from "@/services/ai/video-model-profiles";
 
 type CanvasVideoSettingsPopoverProps = {
@@ -62,12 +62,13 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
 }
 
 function videoSettingsSummary(config: AiConfig) {
-    const profile = getVideoModelProfile(modelOptionName(config.model || config.videoModel), config.apiFormat);
+    const requestConfig = resolveModelRequestConfig(config, config.model || config.videoModel);
+    const profile = getVideoModelProfile(modelOptionName(requestConfig.model || requestConfig.videoModel), requestConfig.apiFormat);
     if (profile.task === "motion-control") {
         const selected = [config.videoMode, config.videoCharacterOrientation, config.videoBackgroundSource].filter(Boolean).length;
         return `动作控制 · ${selected}/${profile.fields.length}`;
     }
-    return `${videoResolutionLabel(config.vquality)} · ${videoSizeLabel(config.size)} · ${videoSecondsLabel(config.videoSeconds)}`;
+    return `${videoResolutionLabel(config.vquality)} · ${videoSizeLabel(config.size)} · ${videoSecondsLabel(config.videoSeconds, requestConfig.apiFormat !== "kie")}`;
 }
 
 function VideoSettingsPortal({
@@ -121,7 +122,9 @@ function VideoSettingsPortal({
             onMouseDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
         >
-            <VideoSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} className="w-full space-y-2.5" />
+            <div className="hide-scrollbar h-full overflow-y-auto overscroll-contain pr-1" onWheel={(event) => event.stopPropagation()}>
+                <VideoSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} className="w-full space-y-2.5 pb-1" />
+            </div>
         </div>,
         document.body,
     );

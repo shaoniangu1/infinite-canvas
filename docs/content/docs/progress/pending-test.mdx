@@ -5,6 +5,12 @@ description: 当前版本已实现但仍需人工验证的变更项
 
 # 待测试
 
+- KIE Seedance 2：配置页 KIE 内置视频模型应新增 `bytedance/seedance-2`、`bytedance/seedance-2-fast`、`bytedance/seedance-2-mini`；画布生成配置选择这些模型时应显示分辨率、比例、时长、生成声音，不显示 Kling motion-control 参数和水印；生成请求体应映射 `reference_image_urls` / `reference_video_urls` / `reference_audio_urls`，空参考素材不传空数组；未填写提示词时应按官方文档在提交前本地报错，参考音频单独使用时也应本地报错。
+- KIE Seedance 2：请求体在没有真实 webhook 地址时不应发送空 `callBackUrl`；`bytedance/seedance-2` 可选择并发送 `4k`，`bytedance/seedance-2-fast` 和 `bytedance/seedance-2-mini` 不应显示或发送 `1080p` / `4k`。
+- KIE Seedance 2：画布视频设置面板和摘要应按当前模型所属 KIE 渠道解析能力，即使全局默认调用格式不是 KIE，`bytedance/seedance-2` 也应显示 `4K`，旧节点残留智能时长时摘要应显示 `5s`。
+- KIE Seedance 2：视频设置不应显示“智能”时长；如果旧节点残留 `videoSeconds=-1`，请求体应按官方默认回落为 `duration: 5`，不应再出现 `Invalid duration`。
+- KIE 异步任务：当 `createTask` 返回业务错误且没有 `data.taskId` 时，失败卡片应显示接口返回的真实 `msg` / `message` / `error`，不应只显示“任务接口没有返回任务 ID”。
+- KIE 异步视频任务：参考图 / 参考视频任务生成较久时前端应最多轮询 30 分钟；超时失败卡片应带任务 ID，便于去 KIE 后台对账；如果 `resultJson` 返回 `resultUrls`、`video_url`、`url` 等常见字段应能提取视频结果。
 - 画布文本节点：文本内容超过节点高度时，鼠标悬停在文本区域应可直接用滚轮滚动，不应触发画布缩放。
 - Canvas Agent：网页 SSE 连接失效后不应残留为可用客户端导致工具调用直接 500；重新连接画布后 `canvas_get_state` 应能正常返回当前画布状态。
 - 画布生成配置：新建或未主动设置生成数量的生图配置节点应默认生成 1 张，不应继承全局历史生图数量导致一次出现多个结果节点。

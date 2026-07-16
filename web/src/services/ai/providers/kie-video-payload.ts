@@ -1,10 +1,13 @@
-import { isKieMotionControlModel, isKling30MotionControlModel, normalizedVideoFieldValue, validateVideoModelInputs } from "../video-model-profiles";
+import { boolConfig, normalizeKieSeedanceResolution, normalizeSeedanceDuration, normalizeSeedanceRatio } from "../seedance-model-settings";
+
+import { isKieMotionControlModel, isKieSeedanceVideoModel, isKling30MotionControlModel, normalizedVideoFieldValue, validateVideoModelInputs } from "../video-model-profiles";
 
 export type KieVideoPayloadConfig = {
     model: string;
     size?: string;
     vquality?: string;
     videoSeconds?: string;
+    videoGenerateAudio?: string;
     videoMode?: string;
     videoCharacterOrientation?: string;
     videoBackgroundSource?: string;
@@ -26,14 +29,28 @@ export function buildKieVideoTaskBody(config: KieVideoPayloadConfig, prompt: str
         };
         return {
             model: config.model,
-            callBackUrl: "",
             input,
+        };
+    }
+    if (isKieSeedanceVideoModel(config.model)) {
+        assertKieSeedanceInput(config, prompt, imageUrls, videoUrls, audioUrls);
+        return {
+            model: config.model,
+            input: {
+                ...(prompt.trim() ? { prompt: prompt.trim() } : {}),
+                resolution: normalizeKieSeedanceResolution(config.vquality, config.model),
+                aspect_ratio: normalizeSeedanceRatio(config.size),
+                duration: normalizeSeedanceDuration(config.videoSeconds, false),
+                generate_audio: boolConfig(config.videoGenerateAudio, true),
+                ...(imageUrls.length ? { reference_image_urls: imageUrls } : {}),
+                ...(videoUrls.length ? { reference_video_urls: videoUrls } : {}),
+                ...(audioUrls.length ? { reference_audio_urls: audioUrls } : {}),
+            },
         };
     }
 
     return {
         model: config.model,
-        callBackUrl: "",
         input: {
             prompt,
             aspect_ratio: normalizeKieAspectRatio(config),
@@ -55,6 +72,12 @@ function assertKieMotionControlInput(config: KieVideoPayloadConfig, prompt: stri
     if (first.includes("背景来源")) throw new Error("请选择动作控制参数：背景来源");
     if (first.includes("模式") || first.includes("人物朝向")) throw new Error("请选择动作控制参数：模式和人物朝向");
     throw new Error(first);
+}
+
+function assertKieSeedanceInput(config: KieVideoPayloadConfig, prompt: string, imageUrls: string[], videoUrls: string[], audioUrls: string[]) {
+    const errors = validateVideoModelInputs(config, { prompt, imageCount: imageUrls.length, videoCount: videoUrls.length, audioCount: audioUrls.length });
+    if (!errors.length) return;
+    throw new Error(errors[0]);
 }
 
 function normalizeKieAspectRatio(config: Pick<KieVideoPayloadConfig, "size">) {

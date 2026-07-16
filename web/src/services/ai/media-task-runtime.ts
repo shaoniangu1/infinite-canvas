@@ -40,7 +40,7 @@ export async function runAsyncTask(config: AiConfig, profile: AsyncTaskProfile, 
         })
     ).data;
     const taskId = stringAtPath(created, profile.taskIdPath);
-    if (!taskId) throw new Error("任务接口没有返回任务 ID");
+    if (!taskId) throw new Error(taskErrorMessage(created) || "任务接口没有返回任务 ID");
 
     const maxAttempts = profile.maxAttempts || 120;
     const intervalMs = profile.pollIntervalMs || 2500;
@@ -57,10 +57,10 @@ export async function runAsyncTask(config: AiConfig, profile: AsyncTaskProfile, 
         if (urls.length && (!status || profile.successStatuses.includes(status))) return { taskId, urls, payload };
         if (profile.successStatuses.includes(status)) throw new Error("任务已完成但没有返回结果 URL");
         if (profile.failureStatuses.includes(status)) throw new Error(taskErrorMessage(payload) || "任务生成失败");
-        if (attempt === maxAttempts - 1) throw new Error(profile.timeoutMessage);
+        if (attempt === maxAttempts - 1) throw new Error(timeoutMessage(profile.timeoutMessage, taskId));
         await delay(intervalMs, options?.signal);
     }
-    throw new Error(profile.timeoutMessage);
+    throw new Error(timeoutMessage(profile.timeoutMessage, taskId));
 }
 
 export function providerUrl(config: Pick<AiConfig, "baseUrl">, path: string) {
@@ -74,7 +74,7 @@ export function extractResultUrls(payload: unknown, profile: Pick<AsyncTaskProfi
     const parsed = typeof resultJson === "string" ? parseJson(resultJson) : resultJson;
     const items = profile.resultItemsPath ? valueAtPath(parsed, profile.resultItemsPath) : undefined;
     const itemUrls = Array.isArray(items) ? items.filter((item): item is string => typeof item === "string" && Boolean(item)) : [];
-    return [...directUrls, ...itemUrls];
+    return Array.from(new Set([...directUrls, ...itemUrls, ...fallbackResultUrls(parsed)]));
 }
 
 export function stringAtPath(payload: unknown, path: string) {
@@ -119,10 +119,25 @@ function parseJson(value: string) {
     }
 }
 
+function fallbackResultUrls(payload: unknown): string[] {
+    if (!payload || typeof payload !== "object") return [];
+    const record = payload as Record<string, unknown>;
+    const arrays = [record.resultUrls, record.result_urls, record.urls, record.videoUrls, record.video_urls];
+    const direct = [record.url, record.videoUrl, record.video_url, record.resultUrl, record.result_url];
+    return [
+        ...arrays.flatMap((item) => (Array.isArray(item) ? item.filter((value): value is string => typeof value === "string" && Boolean(value)) : [])),
+        ...direct.filter((value): value is string => typeof value === "string" && Boolean(value)),
+    ];
+}
+
 function statusMessage(status: number | undefined, fallback: string) {
     if (status === 401 || status === 403) return "鉴权失败，请检查 API Key、套餐权限或模型权限";
     if (status === 429) return "请求被限流或额度不足，请稍后重试";
     return status ? `${fallback}（${status}）` : fallback;
+}
+
+function timeoutMessage(message: string, taskId: string) {
+    return taskId ? `${message}（任务 ID：${taskId}）` : message;
 }
 
 function delay(ms: number, signal?: AbortSignal) {

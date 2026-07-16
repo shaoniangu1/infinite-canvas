@@ -2,9 +2,9 @@ import { type ReactNode } from "react";
 import { Switch } from "antd";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
-import { boolConfig, isSeedanceFastModel, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceDurationOptions, seedancePixelLabel, seedanceRatioOptions, seedanceResolutionOptions } from "@/lib/seedance-video";
+import { boolConfig, isSeedanceFastModel, isSeedanceVideoConfig, normalizeKieSeedanceResolution, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceDurationOptions, seedancePixelLabel, seedanceRatioOptions, seedanceResolutionOptionsForModel } from "@/lib/seedance-video";
 import { type CanvasTheme } from "@/lib/canvas-theme";
-import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
+import { modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import { getVideoModelProfile, type VideoSettingField } from "@/services/ai/video-model-profiles";
 
 const resolutionOptions = [
@@ -36,12 +36,13 @@ type VideoSettingsPanelProps = {
 };
 
 export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-full space-y-2.5 rounded-2xl px-1 py-0.5" }: VideoSettingsPanelProps) {
-    const profile = getVideoModelProfile(modelOptionName(config.model || config.videoModel), config.apiFormat);
+    const requestConfig = resolveModelRequestConfig(config, config.model || config.videoModel);
+    const profile = getVideoModelProfile(modelOptionName(requestConfig.model || requestConfig.videoModel), requestConfig.apiFormat);
     if (profile.task === "motion-control") {
         return <MotionControlVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} fields={profile.fields} />;
     }
     if (isSeedanceVideoConfig(config)) {
-        return <SeedanceVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} />;
+        return <SeedanceVideoSettingsPanel config={requestConfig} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} fields={profile.fields} />;
     }
 
     const seconds = config.videoSeconds || "6";
@@ -94,13 +95,20 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
     );
 }
 
-function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, className }: VideoSettingsPanelProps) {
+function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, className, fields }: VideoSettingsPanelProps & { fields: VideoSettingField[] }) {
     const model = modelOptionName(config.model || config.videoModel);
-    const resolution = normalizeSeedanceResolution(config.vquality, model);
+    const isKieSeedance = config.apiFormat === "kie";
+    const limitFast1080p = !isKieSeedance;
+    const allowSmartDuration = config.apiFormat !== "kie";
+    const resolutionOptions = seedanceResolutionOptionsForModel(model, config.apiFormat);
+    const resolution = isKieSeedance ? normalizeKieSeedanceResolution(config.vquality, model) : normalizeSeedanceResolution(config.vquality, model, limitFast1080p);
     const ratio = normalizeSeedanceRatio(config.size);
-    const duration = normalizeSeedanceDuration(config.videoSeconds);
+    const duration = normalizeSeedanceDuration(config.videoSeconds, allowSmartDuration);
+    const durationOptions = allowSmartDuration ? seedanceDurationOptions : seedanceDurationOptions.filter((value) => value !== -1);
     const generateAudio = boolConfig(config.videoGenerateAudio, true);
     const watermark = boolConfig(config.videoWatermark, false);
+    const showGenerateAudio = hasSeedanceField(fields, "videoGenerateAudio");
+    const showWatermark = hasSeedanceField(fields, "videoWatermark");
 
     return (
         <ImageSettingsTheme theme={theme}>
@@ -108,8 +116,8 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
                 {showTitle ? <div className="text-sm font-semibold">视频设置</div> : null}
                 <SettingGroup title="分辨率" color={theme.node.muted}>
                     <div className="grid grid-cols-3 gap-1.5">
-                        {seedanceResolutionOptions.map((item) => {
-                            const disabled = item.value === "1080p" && isSeedanceFastModel(model);
+                        {resolutionOptions.map((item) => {
+                            const disabled = limitFast1080p && item.value === "1080p" && isSeedanceFastModel(model);
                             return (
                                 <OptionPill key={item.value} selected={resolution === item.value} disabled={disabled} theme={theme} onClick={() => onConfigChange("vquality", item.value)}>
                                     {item.label}
@@ -117,7 +125,7 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
                             );
                         })}
                     </div>
-                    {isSeedanceFastModel(model) ? <div className="text-[10px] leading-4 opacity-55">fast 模型不支持 1080p，会自动使用 720p。</div> : null}
+                    {limitFast1080p && isSeedanceFastModel(model) ? <div className="text-[10px] leading-4 opacity-55">fast 模型不支持 1080p，会自动使用 720p。</div> : null}
                 </SettingGroup>
                 <SettingGroup title="比例" color={theme.node.muted}>
                     <div className="grid grid-cols-3 gap-1.5">
@@ -138,26 +146,33 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
                 </SettingGroup>
                 <SettingGroup title="时长" color={theme.node.muted}>
                     <div className="grid grid-cols-4 gap-1.5">
-                        {seedanceDurationOptions.map((value) => (
+                        {durationOptions.map((value) => (
                             <OptionPill key={value} selected={duration === value} theme={theme} onClick={() => onConfigChange("videoSeconds", String(value))}>
                                 {value === -1 ? "智能" : `${value}s`}
                             </OptionPill>
                         ))}
                     </div>
-                    <NumberInput value={String(duration)} min={-1} max={15} theme={theme} onChange={(value) => onConfigChange("videoSeconds", value)} />
+                    <NumberInput value={String(duration)} min={allowSmartDuration ? -1 : 4} max={15} theme={theme} onChange={(value) => onConfigChange("videoSeconds", value)} />
                 </SettingGroup>
-                <SettingGroup title="输出" color={theme.node.muted}>
-                    <div className="grid gap-1.5 rounded-md border p-2" style={{ borderColor: theme.node.stroke }}>
-                        <SwitchRow label="生成声音" checked={generateAudio} theme={theme} onChange={(checked) => onConfigChange("videoGenerateAudio", String(checked))} />
-                        <SwitchRow label="添加水印" checked={watermark} theme={theme} onChange={(checked) => onConfigChange("videoWatermark", String(checked))} />
-                    </div>
-                </SettingGroup>
+                {showGenerateAudio || showWatermark ? (
+                    <SettingGroup title="输出" color={theme.node.muted}>
+                        <div className="grid gap-1.5 rounded-md border p-2" style={{ borderColor: theme.node.stroke }}>
+                            {showGenerateAudio ? <SwitchRow label="生成声音" checked={generateAudio} theme={theme} onChange={(checked) => onConfigChange("videoGenerateAudio", String(checked))} /> : null}
+                            {showWatermark ? <SwitchRow label="添加水印" checked={watermark} theme={theme} onChange={(checked) => onConfigChange("videoWatermark", String(checked))} /> : null}
+                        </div>
+                    </SettingGroup>
+                ) : null}
             </div>
         </ImageSettingsTheme>
     );
 }
 
+function hasSeedanceField(fields: VideoSettingField[], key: VideoSettingField["key"]) {
+    return fields.some((field) => field.key === key);
+}
+
 export function videoResolutionLabel(value: string) {
+    if (String(value).trim().toLowerCase() === "4k") return "4K";
     return `${normalizeVideoResolutionValue(value)}p`;
 }
 
@@ -169,8 +184,9 @@ export function videoSizeLabel(value: string) {
     return sizeOptions.find((item) => item.value === size)?.label || size;
 }
 
-export function videoSecondsLabel(value: string) {
-    if (String(value).trim() === "-1") return "智能";
+export function videoSecondsLabel(value: string, allowSmart = true) {
+    if (allowSmart && String(value).trim() === "-1") return "智能";
+    if (String(value).trim() === "-1") return "5s";
     return `${value || "6"}s`;
 }
 
