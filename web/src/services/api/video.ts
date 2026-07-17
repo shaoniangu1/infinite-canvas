@@ -44,9 +44,6 @@ function aiHeaders(config: AiConfig, contentType?: string) {
 }
 
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationResult> {
-    const selectedModel = (config.model || config.videoModel).trim();
-    const requestConfig = resolveModelRequestConfig(config, selectedModel);
-    if (requestConfig.apiFormat === "kie" && !resolveModelScript(config, selectedModel)) return requestKieVideo(requestConfig, prompt, references, videoReferences, audioReferences, options);
     const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options);
     const delayMs = task.provider === "seedance" ? 5000 : 2500;
     for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -65,6 +62,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
     const script = resolveModelScript(config, selectedModel);
     if (script) return createPluginVideoTask(requestConfig, selectedModel, script, prompt, references, videoReferences, audioReferences, options);
+    if (requestConfig.apiFormat === "kie") return createKieVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     assertVideoConfig(requestConfig, requestConfig.model);
     if (isSeedanceVideoConfig(requestConfig)) {
         return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
@@ -114,6 +112,13 @@ async function createPluginVideoTask(config: AiConfig, model: string, script: st
             signal: options?.signal,
         }),
     );
+    const id = nanoid();
+    pluginVideoResults.set(id, result);
+    return { id, provider: "plugin", model };
+}
+
+async function createKieVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    const result = await requestKieVideo(config, prompt, references, videoReferences, audioReferences, options);
     const id = nanoid();
     pluginVideoResults.set(id, result);
     return { id, provider: "plugin", model };
