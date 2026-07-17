@@ -124,7 +124,9 @@ function ImageSettingsPortal({
             onMouseDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
         >
-            <ImageSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} className="w-full space-y-2.5" />
+            <div className="hide-scrollbar h-full overflow-y-auto overscroll-contain pr-1" onWheel={(event) => event.stopPropagation()}>
+                <ImageSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} className="w-full space-y-2.5" />
+            </div>
         </div>,
         document.body,
     );

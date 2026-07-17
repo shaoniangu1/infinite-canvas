@@ -26,6 +26,10 @@ export function builtinModelsForProvider(provider: ApiCallFormat) {
     return builtinModelProfiles.filter((profile) => profile.provider === provider).map((profile) => profile.id);
 }
 
+export function isBuiltinModelProvider(provider: ApiCallFormat) {
+    return provider === "alibbit" || provider === "kie";
+}
+
 export function getBuiltinModelProfile(model: string) {
     return builtinModelProfiles.find((profile) => profile.id === model);
 }
