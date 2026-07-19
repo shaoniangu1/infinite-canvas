@@ -165,6 +165,9 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
         videoMode: node.metadata?.videoMode || globalConfig.videoMode || defaultConfig.videoMode,
         videoCharacterOrientation: node.metadata?.videoCharacterOrientation || globalConfig.videoCharacterOrientation || defaultConfig.videoCharacterOrientation,
         videoBackgroundSource: node.metadata?.videoBackgroundSource || globalConfig.videoBackgroundSource || defaultConfig.videoBackgroundSource,
+        videoSeed: node.metadata?.videoSeed ?? globalConfig.videoSeed ?? defaultConfig.videoSeed,
+        videoClipStart: node.metadata?.videoClipStart ?? globalConfig.videoClipStart ?? defaultConfig.videoClipStart,
+        videoClipEnd: node.metadata?.videoClipEnd ?? globalConfig.videoClipEnd ?? defaultConfig.videoClipEnd,
         audioVoice: node.metadata?.audioVoice || globalConfig.audioVoice || defaultConfig.audioVoice,
         audioFormat: node.metadata?.audioFormat || globalConfig.audioFormat || defaultConfig.audioFormat,
         audioSpeed: node.metadata?.audioSpeed || globalConfig.audioSpeed || defaultConfig.audioSpeed,
@@ -180,6 +183,9 @@ function videoConfigPatch(key: keyof AiConfig, value: string) {
     if (key === "videoMode") return { videoMode: value };
     if (key === "videoCharacterOrientation") return { videoCharacterOrientation: value };
     if (key === "videoBackgroundSource") return { videoBackgroundSource: value };
+    if (key === "videoSeed") return { videoSeed: value };
+    if (key === "videoClipStart") return { videoClipStart: value };
+    if (key === "videoClipEnd") return { videoClipEnd: value };
     return { [key]: value };
 }
 

@@ -43,6 +43,9 @@ export type AiConfig = {
     videoMode: string;
     videoCharacterOrientation: string;
     videoBackgroundSource: string;
+    videoSeed: string;
+    videoClipStart: string;
+    videoClipEnd: string;
     systemPrompt: string;
     models: string[];
     quality: string;
@@ -105,6 +108,9 @@ export const defaultConfig: AiConfig = {
     videoMode: "",
     videoCharacterOrientation: "",
     videoBackgroundSource: "",
+    videoSeed: "",
+    videoClipStart: "0",
+    videoClipEnd: "10",
     systemPrompt: "",
     models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
     quality: "auto",
@@ -244,6 +250,9 @@ export const useConfigStore = create<ConfigStore>()(
                         videoMode: config.videoMode || "",
                         videoCharacterOrientation: config.videoCharacterOrientation || "",
                         videoBackgroundSource: config.videoBackgroundSource || "",
+                        videoSeed: config.videoSeed || "",
+                        videoClipStart: config.videoClipStart ?? "0",
+                        videoClipEnd: config.videoClipEnd ?? "10",
                         resolution: config.resolution || defaultConfig.resolution,
                         canvasImageCount: config.canvasImageCount || "1",
                     },

@@ -105,6 +105,9 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
         videoMode: node?.metadata?.videoMode || config.videoMode || defaultConfig.videoMode,
         videoCharacterOrientation: node?.metadata?.videoCharacterOrientation || config.videoCharacterOrientation || defaultConfig.videoCharacterOrientation,
         videoBackgroundSource: node?.metadata?.videoBackgroundSource || config.videoBackgroundSource || defaultConfig.videoBackgroundSource,
+        videoSeed: node?.metadata?.videoSeed ?? config.videoSeed ?? defaultConfig.videoSeed,
+        videoClipStart: node?.metadata?.videoClipStart ?? config.videoClipStart ?? defaultConfig.videoClipStart,
+        videoClipEnd: node?.metadata?.videoClipEnd ?? config.videoClipEnd ?? defaultConfig.videoClipEnd,
         audioVoice: node?.metadata?.audioVoice || config.audioVoice || defaultConfig.audioVoice,
         audioFormat: node?.metadata?.audioFormat || config.audioFormat || defaultConfig.audioFormat,
         audioSpeed: node?.metadata?.audioSpeed || config.audioSpeed || defaultConfig.audioSpeed,
@@ -144,6 +147,7 @@ export function sourceNodeReferenceImages(node: CanvasNodeData | null) {
             type: node.metadata.mimeType || "image/png",
             dataUrl: node.metadata.content,
             storageKey: node.metadata.storageKey,
+            bytes: node.metadata.bytes,
         },
     ];
 }

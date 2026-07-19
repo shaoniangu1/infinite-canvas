@@ -79,6 +79,7 @@
 
 ## 项目注意事项
 
+- 新增或调整 AI 渠道、模型、模型参数或请求协议前，必须先阅读并遵循 `docs/content/docs/development/provider-model-integration.mdx`，按 Model Profile、Provider Adapter 和调用脚本的职责边界实施。
 - 需要读取或操作当前网页画布内容时，优先通过本地 Canvas Agent / infinite-canvas MCP 工具（如 `canvas_get_state`、`canvas_apply_ops`）获取和修改画布状态；浏览器 DOM / 截图只用于 UI 视觉验证，不作为首选画布数据来源。
 - 本项目调试和验证禁止调用 in-app browser / in-browser 能力；需要读取或操作当前画布时必须走已连接的本地 Canvas Agent / infinite-canvas MCP 工具，除非用户明确临时允许浏览器能力。
 - 当前画布项目和“我的素材”主要保存在浏览器本地，不要在文档中误写成已支持云同步。

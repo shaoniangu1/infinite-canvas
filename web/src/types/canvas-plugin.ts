@@ -27,6 +27,14 @@ export type CanvasPluginAi = {
     defaultModel: (capability: PluginModelCapability) => string;
 };
 
+export type CanvasPluginMediaSource = { storageKey?: string; url?: string };
+export type CanvasPluginMediaFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
+export type CanvasPluginMedia = {
+    read: (source: CanvasPluginMediaSource) => Promise<Blob>;
+    save: (blob: Blob, prefix?: string) => Promise<CanvasPluginMediaFile>;
+    remove: (storageKey: string) => Promise<void>;
+};
+
 // 节点自带的工具栏按钮(追加到 hover 工具栏尾部)
 export type CanvasNodeToolbarItem = {
     id: string;
@@ -60,6 +68,8 @@ export type CanvasNodeContext = {
     on: (event: string, handler: (payload: unknown) => void) => () => void;
     // AI 生成能力(生图/生视频/生文本),复用宿主模型配置
     ai: CanvasPluginAi;
+    // 浏览器本地媒体读写；插件无需感知 IndexedDB/store 结构
+    media: CanvasPluginMedia;
     // 打开/关闭本节点下方的自定义 Panel(需在节点定义里提供 Panel)
     openPanel: () => void;
     closePanel: () => void;
@@ -85,6 +95,7 @@ export type CanvasPluginHost = {
     applyOps: (ops: CanvasAgentOp[]) => void;
     // AI 生成能力,复用画布页面当前的模型/密钥配置
     ai: CanvasPluginAi;
+    media: CanvasPluginMedia;
     // 打开/关闭指定节点下方的自定义 Panel
     openPanel: (nodeId: string) => void;
     closePanel: () => void;

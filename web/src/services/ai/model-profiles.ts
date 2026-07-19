@@ -18,6 +18,7 @@ export const builtinModelProfiles: ModelProfile[] = [
     { id: "bytedance/seedance-2", label: "KIE Seedance 2", provider: "kie", capabilities: ["video"] },
     { id: "bytedance/seedance-2-fast", label: "KIE Seedance 2 Fast", provider: "kie", capabilities: ["video"] },
     { id: "bytedance/seedance-2-mini", label: "KIE Seedance 2 Mini", provider: "kie", capabilities: ["video"] },
+    { id: "gemini-omni-video", label: "KIE Gemini Omni Video", provider: "kie", capabilities: ["video"] },
     { id: "kling-2.6/motion-control", label: "KIE Kling 2.6 Motion Control", provider: "kie", capabilities: ["video"] },
     { id: "kling-3.0/motion-control", label: "KIE Kling 3.0 Motion Control", provider: "kie", capabilities: ["video"] },
 ];

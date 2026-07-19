@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, type Dispatch, type MutableRefObject, 
 
 import { requestEdit, requestGeneration, requestImageQuestion, type AiTextMessage } from "@/services/api/image";
 import { requestVideoGeneration, storeGeneratedVideo } from "@/services/api/video";
+import { deleteStoredMedia, getMediaBlob, uploadMediaFile } from "@/services/file-storage";
 import { decodeChannelModel, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 import { buildGenerationConfig } from "@/lib/canvas/canvas-generation-helpers";
 import { buildNodeContext } from "@/lib/canvas/plugin-node-context";
+import { createPluginMedia } from "@/lib/canvas/plugin-media";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { ensurePluginsLoaded } from "@/lib/canvas/plugin-loader";
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -78,6 +80,21 @@ export function usePluginHost(params: PluginHostParams) {
         };
     }, [effectiveConfig, isAiConfigReady, openConfigDialog]);
 
+    const pluginMedia = useMemo(
+        () =>
+            createPluginMedia({
+                getMediaBlob,
+                uploadMediaFile,
+                deleteStoredMedia,
+                fetchBlob: async (url) => {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`媒体文件下载失败（${response.status}）`);
+                    return response.blob();
+                },
+            }),
+        [],
+    );
+
     const pluginHost = useMemo<CanvasPluginHost>(
         () => ({
             getNode: (id) => nodesRef.current.find((node) => node.id === id) || null,
@@ -97,10 +114,11 @@ export function usePluginHost(params: PluginHostParams) {
             updateMetadata: (nodeId, patch) => setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, ...patch } } : node))),
             applyOps: (ops) => applyAgentOps(ops),
             ai: pluginAi,
+            media: pluginMedia,
             openPanel: (nodeId) => setDialogNodeId(nodeId),
             closePanel: () => setDialogNodeId(null),
         }),
-        [applyAgentOps, pluginAi],
+        [applyAgentOps, pluginAi, pluginMedia],
     );
 
     const renderPluginPanel = useCallback(

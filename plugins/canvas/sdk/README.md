@@ -11,6 +11,7 @@ Infinite Canvas 画布节点插件的 **TypeScript SDK**。插件作者只写节
 | automatic JSX | `jsxImportSource` 指向本包,TSX 自动转发到宿主 React,**不打包第二份 React** |
 | 类型化 hooks | `import { useState, useEffect, useMemo, useRef, ... }`,运行时转发宿主 React |
 | `buildPlugin(...)` | 统一 esbuild 构建,插件 `build.mjs` 只需一行 |
+| `ctx.media` | 通过宿主读取、保存和删除浏览器本地媒体 Blob,无需接触 IndexedDB 结构 |
 
 ## 最小插件
 
@@ -74,4 +75,5 @@ await buildPlugin(import.meta.url);
 
 - **React 单例**:JSX 与 hooks 惰性读取 `globalThis.InfiniteCanvasRuntime.React`(宿主在加载插件前注入),react 全程 external,绝不打包第二份。
 - **重依赖**:three、marked 等在源码里 `await import("https://esm.sh/...")` 动态加载,esbuild 自动 external,不进 bundle。
+- **本地媒体**:`ctx.media.read/save/remove` 由宿主代理浏览器本地媒体存储,适合转码、裁剪、抽帧等处理插件。
 - **类型真源**:`src/types.ts` 是宿主 `web/src/types/canvas-plugin.ts` 公开契约的镜像;宿主契约变更时同步此处。

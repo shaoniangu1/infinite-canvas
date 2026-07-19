@@ -3,11 +3,10 @@ import { createPortal } from "react-dom";
 import { Settings2 } from "lucide-react";
 import { Button } from "antd";
 
-import { VideoSettingsPanel, videoResolutionLabel, videoSecondsLabel, videoSizeLabel } from "@/components/video-settings-panel";
+import { VideoSettingsPanel, videoSettingsSummary } from "@/components/video-settings-panel";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
-import { getVideoModelProfile } from "@/services/ai/video-model-profiles";
+import type { AiConfig } from "@/stores/use-config-store";
 
 type CanvasVideoSettingsPopoverProps = {
     config: AiConfig;
@@ -59,16 +58,6 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
             {panel}
         </>
     );
-}
-
-function videoSettingsSummary(config: AiConfig) {
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.videoModel);
-    const profile = getVideoModelProfile(modelOptionName(requestConfig.model || requestConfig.videoModel), requestConfig.apiFormat);
-    if (profile.task === "motion-control") {
-        const selected = [config.videoMode, config.videoCharacterOrientation, config.videoBackgroundSource].filter(Boolean).length;
-        return `动作控制 · ${selected}/${profile.fields.length}`;
-    }
-    return `${videoResolutionLabel(config.vquality)} · ${videoSizeLabel(config.size)} · ${videoSecondsLabel(config.videoSeconds, requestConfig.apiFormat !== "kie")}`;
 }
 
 function VideoSettingsPortal({

@@ -47,6 +47,9 @@ export type CanvasNodeMetadata = {
     videoMode?: string;
     videoCharacterOrientation?: string;
     videoBackgroundSource?: string;
+    videoSeed?: string;
+    videoClipStart?: string;
+    videoClipEnd?: string;
     audioVoice?: string;
     audioFormat?: string;
     audioSpeed?: string;

@@ -2224,6 +2224,9 @@ function InfiniteCanvasPage() {
                         imageCount: generationContext.referenceImages.length,
                         videoCount: generationContext.referenceVideos.length,
                         audioCount: generationContext.referenceAudios.length,
+                        imageBytes: generationContext.referenceImages.map((item) => item.bytes),
+                        videoBytes: generationContext.referenceVideos.map((item) => item.bytes),
+                        videoDurationsMs: generationContext.referenceVideos.map((item) => item.durationMs),
                     });
                     if (videoInputErrors.length) {
                         const errorDetails = videoInputErrors.join("；");
@@ -2254,6 +2257,9 @@ function InfiniteCanvasPage() {
                             videoMode: generationConfig.videoMode,
                             videoCharacterOrientation: generationConfig.videoCharacterOrientation,
                             videoBackgroundSource: generationConfig.videoBackgroundSource,
+                            videoSeed: generationConfig.videoSeed,
+                            videoClipStart: generationConfig.videoClipStart,
+                            videoClipEnd: generationConfig.videoClipEnd,
                             references: generationReferenceUrls(generationContext),
                         },
                     };
@@ -2291,6 +2297,9 @@ function InfiniteCanvasPage() {
                                               videoMode: generationConfig.videoMode,
                                               videoCharacterOrientation: generationConfig.videoCharacterOrientation,
                                               videoBackgroundSource: generationConfig.videoBackgroundSource,
+                                              videoSeed: generationConfig.videoSeed,
+                                              videoClipStart: generationConfig.videoClipStart,
+                                              videoClipEnd: generationConfig.videoClipEnd,
                                               references: generationReferenceUrls(generationContext),
                                           },
                                       }
@@ -2478,6 +2487,9 @@ function InfiniteCanvasPage() {
                         imageCount: retryImages.length,
                         videoCount: context?.referenceVideos.length || 0,
                         audioCount: context?.referenceAudios.length || 0,
+                        imageBytes: retryImages.map((item) => item.bytes),
+                        videoBytes: (context?.referenceVideos || []).map((item) => item.bytes),
+                        videoDurationsMs: (context?.referenceVideos || []).map((item) => item.durationMs),
                     });
                     if (videoInputErrors.length) {
                         const errorDetails = videoInputErrors.join("；");
@@ -2508,6 +2520,9 @@ function InfiniteCanvasPage() {
                                           videoMode: generationConfig.videoMode,
                                           videoCharacterOrientation: generationConfig.videoCharacterOrientation,
                                           videoBackgroundSource: generationConfig.videoBackgroundSource,
+                                          videoSeed: generationConfig.videoSeed,
+                                          videoClipStart: generationConfig.videoClipStart,
+                                          videoClipEnd: generationConfig.videoClipEnd,
                                       },
                                   }
                                 : item,

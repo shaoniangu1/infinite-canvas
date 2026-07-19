@@ -5,6 +5,7 @@
   "pages": [
     "local-development",
     "canvas-data-structure",
+    "provider-model-integration",
     "local-codex-canvas"
   ]
 }

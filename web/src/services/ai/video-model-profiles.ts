@@ -1,12 +1,15 @@
 export type VideoProviderKey = "openai" | "gemini" | "alibbit" | "kie";
-export type VideoTaskKind = "text-to-video" | "image-to-video" | "reference-video" | "motion-control";
-export type VideoSettingFieldKey = "size" | "vquality" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark" | "mode" | "character_orientation" | "background_source";
+export type VideoTaskKind = "text-to-video" | "image-to-video" | "reference-video" | "motion-control" | "multimodal-video";
+export type VideoSettingFieldKey = "size" | "vquality" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark" | "mode" | "character_orientation" | "background_source" | "seed" | "clip_start" | "clip_end";
 export type VideoSettingField = {
     key: VideoSettingFieldKey;
     label: string;
     description?: string;
-    type: "preset" | "select";
+    type: "preset" | "select" | "number";
     required?: boolean;
+    requiredWhen?: "video";
+    min?: number;
+    max?: number;
     options?: Array<{ value: string; label: string }>;
 };
 export type VideoModelProfile = {
@@ -14,9 +17,9 @@ export type VideoModelProfile = {
     provider: VideoProviderKey | "generic";
     task: VideoTaskKind;
     assets: {
-        images?: { min?: number; max?: number; roles: string[] };
-        videos?: { min?: number; max?: number; roles: string[] };
-        audios?: { min?: number; max?: number; roles: string[] };
+        images?: { min?: number; max?: number; maxBytes?: number; maxDurationMs?: number; roles: string[] };
+        videos?: { min?: number; max?: number; maxBytes?: number; maxDurationMs?: number; roles: string[] };
+        audios?: { min?: number; max?: number; maxBytes?: number; maxDurationMs?: number; roles: string[] };
     };
     fields: VideoSettingField[];
 };
@@ -25,12 +28,21 @@ export type VideoModelValidationContext = {
     imageCount?: number;
     videoCount?: number;
     audioCount?: number;
+    imageBytes?: Array<number | undefined>;
+    videoBytes?: Array<number | undefined>;
+    videoDurationsMs?: Array<number | undefined>;
 };
 type VideoModelInputConfig = {
     model: string;
+    size?: string;
+    vquality?: string;
+    videoSeconds?: string;
     videoMode?: string;
     videoCharacterOrientation?: string;
     videoBackgroundSource?: string;
+    videoSeed?: string;
+    videoClipStart?: string;
+    videoClipEnd?: string;
 };
 
 const baseVideoFields: VideoSettingField[] = [
@@ -48,6 +60,15 @@ const seedanceFields: VideoSettingField[] = [
 ];
 
 const kieSeedanceFields: VideoSettingField[] = seedanceFields.filter((field) => field.key !== "videoWatermark");
+
+const kieGeminiOmniVideoFields: VideoSettingField[] = [
+    { key: "vquality", label: "分辨率", type: "preset", options: ["720p", "1080p", "4k"].map((value) => ({ value, label: value })) },
+    { key: "size", label: "比例", type: "preset", options: ["16:9", "9:16"].map((value) => ({ value, label: value })) },
+    { key: "videoSeconds", label: "时长", type: "preset", required: true, options: ["4", "6", "8", "10"].map((value) => ({ value, label: `${value} 秒` })) },
+    { key: "seed", label: "Seed", type: "number", min: 0, max: 2147483647 },
+    { key: "clip_start", label: "视频开始时间", type: "number", requiredWhen: "video", min: 0, max: 30 },
+    { key: "clip_end", label: "视频结束时间", type: "number", requiredWhen: "video", min: 0, max: 30 },
+];
 
 const motionControlBaseFields: VideoSettingField[] = [
     {
@@ -90,6 +111,18 @@ const kling30MotionControlFields: VideoSettingField[] = [
 
 export function getVideoModelProfile(model: string, provider: VideoProviderKey | "generic" = "generic"): VideoModelProfile {
     const normalized = normalizeVideoModelName(model);
+    if (isKieGeminiOmniVideoModel(normalized)) {
+        return {
+            id: normalized,
+            provider: "kie",
+            task: "multimodal-video",
+            assets: {
+                images: { max: 7, maxBytes: 20 * 1024 * 1024, roles: ["reference_image"] },
+                videos: { max: 1, maxBytes: 100 * 1024 * 1024, maxDurationMs: 30_000, roles: ["reference_video"] },
+            },
+            fields: kieGeminiOmniVideoFields,
+        };
+    }
     if (isKieMotionControlModel(normalized)) {
         return {
             id: normalized,
@@ -143,6 +176,7 @@ export function hasVideoProfileField(profile: VideoModelProfile, key: VideoSetti
 
 export function validateVideoModelInputs(config: VideoModelInputConfig, context: VideoModelValidationContext = {}) {
     const profile = getVideoModelProfile(config.model, "kie");
+    if (isKieGeminiOmniVideoModel(profile.id)) return validateKieGeminiOmniVideoInputs(config, context);
     if (profile.provider === "kie" && isKieSeedanceVideoModel(profile.id)) return validateKieSeedanceInputs(context);
     if (profile.task !== "motion-control") return [];
 
@@ -182,8 +216,24 @@ export function isKieSeedanceVideoModel(model: string) {
     return /^bytedance\/seedance-2(?:-(?:fast|mini))?$/i.test(normalizeVideoModelName(model));
 }
 
+export function isKieGeminiOmniVideoModel(model: string) {
+    return /^gemini-omni-video$/i.test(normalizeVideoModelName(model));
+}
+
 export function normalizeVideoModelName(model: string) {
     return (model || "").split("::").pop()?.trim() || "";
+}
+
+export function videoClipValidationMessage(startValue: string, endValue: string, videoDurationMs?: number) {
+    if (startValue === "" || endValue === "") return "";
+    const start = Number(startValue);
+    const end = Number(endValue);
+    if (!Number.isFinite(start) || start < 0) return "视频开始时间必须是大于等于 0 的数字";
+    if (!Number.isFinite(end) || end <= start) return "视频结束时间必须大于开始时间";
+    if (end - start > 10) return "视频截取时长不能超过 10 秒";
+    if (end > 30) return "视频结束时间不能超过 30 秒";
+    if (videoDurationMs && end * 1000 > videoDurationMs) return "视频结束时间不能超过参考视频时长";
+    return "";
 }
 
 function isSeedanceModel(model: string) {
@@ -200,6 +250,35 @@ function validateKieSeedanceInputs(context: VideoModelValidationContext) {
     return errors;
 }
 
+function validateKieGeminiOmniVideoInputs(config: VideoModelInputConfig, context: VideoModelValidationContext) {
+    const imageCount = context.imageCount || 0;
+    const videoCount = context.videoCount || 0;
+    const audioCount = context.audioCount || 0;
+    const errors: string[] = [];
+    if (!context.prompt?.trim()) errors.push("KIE Gemini Omni Video 提示词必填");
+    else if (context.prompt.length > 20_000) errors.push("KIE Gemini Omni Video 提示词不能超过 20000 个字符");
+    if (imageCount > 7) errors.push("参考图最多 7 张");
+    if (videoCount > 1) errors.push("参考视频最多 1 个");
+    if (audioCount) errors.push("Gemini Omni Video 不支持参考音频");
+    if (imageCount + videoCount * 2 > 7) errors.push("图片与视频合计超出 7 个素材槽位，1 个视频占 2 个槽位");
+    if (context.imageBytes?.some((bytes) => Boolean(bytes && bytes > 20 * 1024 * 1024))) errors.push("参考图单张不能超过 20MB");
+    if (context.videoBytes?.some((bytes) => Boolean(bytes && bytes > 100 * 1024 * 1024))) errors.push("参考视频不能超过 100MB");
+    if (context.videoDurationsMs?.some((duration) => Boolean(duration && duration > 30_000))) errors.push("参考视频时长不能超过 30 秒");
+    if (!["4", "6", "8", "10"].includes(config.videoSeconds || "")) errors.push("时长仅支持 4、6、8 或 10 秒");
+    if (config.size && !["16:9", "9:16"].includes(config.size)) errors.push("比例仅支持 16:9 或 9:16");
+    if (config.vquality && !["720p", "1080p", "4k"].includes(config.vquality)) errors.push("分辨率仅支持 720p、1080p 或 4k");
+    if (config.videoSeed && (!/^\d+$/.test(config.videoSeed) || Number(config.videoSeed) > 2147483647)) errors.push("Seed 必须是 0 到 2147483647 之间的整数");
+    if (videoCount) {
+        if (config.videoClipStart === undefined || config.videoClipStart === "") errors.push("视频开始时间必填");
+        if (config.videoClipEnd === undefined || config.videoClipEnd === "") errors.push("视频结束时间必填");
+        if (config.videoClipStart !== undefined && config.videoClipStart !== "" && config.videoClipEnd !== undefined && config.videoClipEnd !== "") {
+            const clipError = videoClipValidationMessage(config.videoClipStart, config.videoClipEnd, context.videoDurationsMs?.[0]);
+            if (clipError) errors.push(clipError);
+        }
+    }
+    return errors;
+}
+
 function videoFieldValue(config: VideoModelInputConfig, field: VideoSettingField) {
     const value = rawVideoFieldValue(config, field.key);
     if (!value) return "";
@@ -211,5 +290,8 @@ function rawVideoFieldValue(config: VideoModelInputConfig, key: VideoSettingFiel
     if (key === "mode") return config.videoMode || "";
     if (key === "character_orientation") return config.videoCharacterOrientation || "";
     if (key === "background_source") return config.videoBackgroundSource || "";
+    if (key === "seed") return config.videoSeed || "";
+    if (key === "clip_start") return config.videoClipStart || "";
+    if (key === "clip_end") return config.videoClipEnd || "";
     return "";
 }

@@ -33,6 +33,8 @@ function tempPath(path) {
 const profilesPath = resolve("src/services/ai/video-model-profiles.ts");
 const kiePayloadPath = resolve("src/services/ai/providers/kie-video-payload.ts");
 const mediaTaskRuntimePath = resolve("src/services/ai/media-task-runtime.ts");
+const kieProviderPath = resolve("src/services/ai/providers/kie-provider.ts");
+const viteConfigPath = resolve("vite.config.ts");
 
 after(async () => {
     await rm(resolve(".tmp-tests"), { recursive: true, force: true });
@@ -375,6 +377,211 @@ test("KIE Seedance 2 fast and mini reject 1080p by falling back to 720p", async 
 
     assert.equal(fastBody.input.resolution, "720p");
     assert.equal(miniBody.input.resolution, "720p");
+});
+
+test("KIE Gemini Omni Video profile exposes only the core video workflow", async () => {
+    const { getVideoModelProfile } = await importTs(profilesPath);
+    const profile = getVideoModelProfile("gemini-omni-video", "kie");
+
+    assert.equal(profile.provider, "kie");
+    assert.equal(profile.task, "multimodal-video");
+    assert.deepEqual(
+        profile.fields.map((field) => field.key),
+        ["vquality", "size", "videoSeconds", "seed", "clip_start", "clip_end"],
+    );
+    assert.deepEqual(profile.assets.images, { max: 7, maxBytes: 20 * 1024 * 1024, roles: ["reference_image"] });
+    assert.deepEqual(profile.assets.videos, { max: 1, maxBytes: 100 * 1024 * 1024, maxDurationMs: 30_000, roles: ["reference_video"] });
+    assert.equal(profile.assets.audios, undefined);
+    assert.deepEqual(
+        profile.fields.filter((field) => ["seed", "clip_start", "clip_end"].includes(field.key)).map(({ key, type, min, max, requiredWhen }) => ({ key, type, min, max, requiredWhen })),
+        [
+            { key: "seed", type: "number", min: 0, max: 2147483647, requiredWhen: undefined },
+            { key: "clip_start", type: "number", min: 0, max: 30, requiredWhen: "video" },
+            { key: "clip_end", type: "number", min: 0, max: 30, requiredWhen: "video" },
+        ],
+    );
+});
+
+test("KIE Gemini Omni Video payload matches the official request example", async () => {
+    const { buildKieVideoTaskBody } = await importTs(kiePayloadPath);
+    const body = buildKieVideoTaskBody(
+        {
+            model: "gemini-omni-video",
+            size: "16:9",
+            vquality: "720p",
+            videoSeconds: "4",
+            videoSeed: "1688",
+            videoClipStart: "0",
+            videoClipEnd: "10",
+        },
+        "turn the references into a short video",
+        ["https://example.com/reference.png"],
+        ["https://example.com/reference.mp4"],
+        [],
+    );
+
+    assert.deepEqual(body, {
+        model: "gemini-omni-video",
+        input: {
+            prompt: "turn the references into a short video",
+            image_urls: ["https://example.com/reference.png"],
+            video_list: [{ url: "https://example.com/reference.mp4", start: 0, ends: 10 }],
+            duration: "4",
+            aspect_ratio: "16:9",
+            seed: 1688,
+            resolution: "720p",
+        },
+    });
+});
+
+test("KIE Gemini Omni Video omits unselected optional fields and empty assets", async () => {
+    const { buildKieVideoTaskBody } = await importTs(kiePayloadPath);
+    const body = buildKieVideoTaskBody(
+        { model: "gemini-omni-video", videoSeconds: "6" },
+        "make a video",
+        [],
+        [],
+        [],
+    );
+
+    assert.deepEqual(body, {
+        model: "gemini-omni-video",
+        input: {
+            prompt: "make a video",
+            duration: "6",
+        },
+    });
+});
+
+test("KIE Gemini Omni Video validates prompt, enums, seed and asset limits", async () => {
+    const { validateVideoModelInputs } = await importTs(profilesPath);
+    const errors = validateVideoModelInputs(
+        {
+            model: "gemini-omni-video",
+            size: "1:1",
+            vquality: "8k",
+            videoSeconds: "5",
+            videoSeed: "2147483648",
+            videoClipStart: "0",
+            videoClipEnd: "10",
+        },
+        { prompt: "", imageCount: 8, videoCount: 2, audioCount: 1 },
+    );
+
+    assert.deepEqual(errors, [
+        "KIE Gemini Omni Video 提示词必填",
+        "参考图最多 7 张",
+        "参考视频最多 1 个",
+        "Gemini Omni Video 不支持参考音频",
+        "图片与视频合计超出 7 个素材槽位，1 个视频占 2 个槽位",
+        "时长仅支持 4、6、8 或 10 秒",
+        "比例仅支持 16:9 或 9:16",
+        "分辨率仅支持 720p、1080p 或 4k",
+        "Seed 必须是 0 到 2147483647 之间的整数",
+    ]);
+});
+
+test("KIE Gemini Omni Video rejects prompts longer than 20000 characters", async () => {
+    const { validateVideoModelInputs } = await importTs(profilesPath);
+
+    assert.deepEqual(
+        validateVideoModelInputs(
+            { model: "gemini-omni-video", videoSeconds: "4" },
+            { prompt: "x".repeat(20_001) },
+        ),
+        ["KIE Gemini Omni Video 提示词不能超过 20000 个字符"],
+    );
+});
+
+test("KIE Gemini Omni Video validates video trim bounds", async () => {
+    const { validateVideoModelInputs } = await importTs(profilesPath);
+
+    assert.deepEqual(
+        validateVideoModelInputs(
+            { model: "gemini-omni-video", videoSeconds: "4" },
+            { prompt: "prompt", videoCount: 1 },
+        ),
+        ["视频开始时间必填", "视频结束时间必填"],
+    );
+    assert.deepEqual(
+        validateVideoModelInputs(
+            { model: "gemini-omni-video", videoSeconds: "4", videoClipStart: "10", videoClipEnd: "5" },
+            { prompt: "prompt", videoCount: 1 },
+        ),
+        ["视频结束时间必须大于开始时间"],
+    );
+    assert.deepEqual(
+        validateVideoModelInputs(
+            { model: "gemini-omni-video", videoSeconds: "4", videoClipStart: "0", videoClipEnd: "11" },
+            { prompt: "prompt", videoCount: 1 },
+        ),
+        ["视频截取时长不能超过 10 秒"],
+    );
+    assert.deepEqual(
+        validateVideoModelInputs(
+            { model: "gemini-omni-video", videoSeconds: "4", videoClipStart: "21", videoClipEnd: "31" },
+            { prompt: "prompt", videoCount: 1 },
+        ),
+        ["视频结束时间不能超过 30 秒"],
+    );
+});
+
+test("KIE Gemini Omni Video exposes an immediate trim validation message", async () => {
+    const { videoClipValidationMessage } = await importTs(profilesPath);
+
+    assert.equal(videoClipValidationMessage("0", "12"), "视频截取时长不能超过 10 秒");
+    assert.equal(videoClipValidationMessage("12", "22"), "");
+});
+
+test("KIE Gemini Omni Video validates reference file size and source video duration", async () => {
+    const { validateVideoModelInputs } = await importTs(profilesPath);
+
+    assert.deepEqual(
+        validateVideoModelInputs(
+            { model: "gemini-omni-video", videoSeconds: "4", videoClipStart: "0", videoClipEnd: "8" },
+            {
+                prompt: "prompt",
+                imageCount: 1,
+                videoCount: 1,
+                imageBytes: [20 * 1024 * 1024 + 1],
+                videoBytes: [100 * 1024 * 1024 + 1],
+                videoDurationsMs: [31_000],
+            },
+        ),
+        ["参考图单张不能超过 20MB", "参考视频不能超过 100MB", "参考视频时长不能超过 30 秒"],
+    );
+    assert.deepEqual(
+        validateVideoModelInputs(
+            { model: "gemini-omni-video", videoSeconds: "4", videoClipStart: "0", videoClipEnd: "8" },
+            { prompt: "prompt", videoCount: 1, videoDurationsMs: [6_000] },
+        ),
+        ["视频结束时间不能超过参考视频时长"],
+    );
+});
+
+test("KIE Gemini Omni Video rejects invalid payload before creating a task", async () => {
+    const { buildKieVideoTaskBody } = await importTs(kiePayloadPath);
+
+    assert.throws(
+        () => buildKieVideoTaskBody({ model: "gemini-omni-video", videoSeconds: "4" }, "", [], [], []),
+        /提示词必填/,
+    );
+    assert.throws(
+        () => buildKieVideoTaskBody({ model: "gemini-omni-video", videoSeconds: "4" }, "prompt", [], [], ["https:\/\/example.com\/audio.mp3"]),
+        /不支持参考音频/,
+    );
+});
+
+test("KIE Gemini Omni Video preview is captured before createTask submission", async () => {
+    const providerSource = await readFile(kieProviderPath, "utf8");
+    const requestKieVideo = providerSource.slice(providerSource.indexOf("export async function requestKieVideo"), providerSource.indexOf("async function uploadKieImageReference"));
+    const viteConfig = await readFile(viteConfigPath, "utf8");
+
+    assert.match(requestKieVideo, /isKieGeminiOmniVideoModel/);
+    assert.match(requestKieVideo, /await captureKieRequestPreview\(body\)/);
+    assert.ok(requestKieVideo.indexOf("await captureKieRequestPreview(body)") < requestKieVideo.indexOf("runAsyncTask("));
+    assert.match(viteConfig, /\/__debug\/kie-request-preview/);
+    assert.match(viteConfig, /infinite-canvas-kie-request-preview\.json/);
 });
 
 test("KIE result URL extraction accepts common resultJson url shapes", async () => {

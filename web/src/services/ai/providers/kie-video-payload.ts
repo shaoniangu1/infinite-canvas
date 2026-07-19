@@ -1,6 +1,6 @@
 import { boolConfig, normalizeKieSeedanceResolution, normalizeSeedanceDuration, normalizeSeedanceRatio } from "../seedance-model-settings";
 
-import { isKieMotionControlModel, isKieSeedanceVideoModel, isKling30MotionControlModel, normalizedVideoFieldValue, validateVideoModelInputs } from "../video-model-profiles";
+import { isKieGeminiOmniVideoModel, isKieMotionControlModel, isKieSeedanceVideoModel, isKling30MotionControlModel, normalizedVideoFieldValue, validateVideoModelInputs } from "../video-model-profiles";
 
 export type KieVideoPayloadConfig = {
     model: string;
@@ -11,9 +11,25 @@ export type KieVideoPayloadConfig = {
     videoMode?: string;
     videoCharacterOrientation?: string;
     videoBackgroundSource?: string;
+    videoSeed?: string;
+    videoClipStart?: string;
+    videoClipEnd?: string;
 };
 
 export function buildKieVideoTaskBody(config: KieVideoPayloadConfig, prompt: string, imageUrls: string[], videoUrls: string[], audioUrls: string[]) {
+    if (isKieGeminiOmniVideoModel(config.model)) {
+        assertKieGeminiOmniVideoInput(config, prompt, imageUrls, videoUrls, audioUrls);
+        const input = {
+            prompt: prompt.trim(),
+            ...(imageUrls.length ? { image_urls: imageUrls } : {}),
+            ...(videoUrls.length ? { video_list: [{ url: videoUrls[0], start: Number(config.videoClipStart), ends: Number(config.videoClipEnd) }] } : {}),
+            duration: config.videoSeconds,
+            ...(["16:9", "9:16"].includes(config.size || "") ? { aspect_ratio: config.size } : {}),
+            ...(config.videoSeed ? { seed: Number(config.videoSeed) } : {}),
+            ...(["720p", "1080p", "4k"].includes(config.vquality || "") ? { resolution: config.vquality } : {}),
+        };
+        return { model: config.model, input };
+    }
     if (isKieMotionControlModel(config.model)) {
         assertKieMotionControlInput(config, prompt, imageUrls, videoUrls);
         const videoMode = normalizedVideoFieldValue(config, "mode");
@@ -72,6 +88,11 @@ function assertKieMotionControlInput(config: KieVideoPayloadConfig, prompt: stri
     if (first.includes("背景来源")) throw new Error("请选择动作控制参数：背景来源");
     if (first.includes("模式") || first.includes("人物朝向")) throw new Error("请选择动作控制参数：模式和人物朝向");
     throw new Error(first);
+}
+
+function assertKieGeminiOmniVideoInput(config: KieVideoPayloadConfig, prompt: string, imageUrls: string[], videoUrls: string[], audioUrls: string[]) {
+    const errors = validateVideoModelInputs(config, { prompt, imageCount: imageUrls.length, videoCount: videoUrls.length, audioCount: audioUrls.length });
+    if (errors.length) throw new Error(errors[0]);
 }
 
 function assertKieSeedanceInput(config: KieVideoPayloadConfig, prompt: string, imageUrls: string[], videoUrls: string[], audioUrls: string[]) {

@@ -36,6 +36,13 @@ async function importAlibbitProvider() {
     return import(`${pathToFileURL(path).href}?t=${Date.now()}`);
 }
 
+async function importModelProfiles() {
+    const path = await transpile(resolve("src/services/ai/model-profiles.ts"), [
+        ['import type { ApiCallFormat, ModelCapability } from "@/stores/use-config-store";', ""],
+    ]);
+    return import(`${pathToFileURL(path).href}?t=${Date.now()}`);
+}
+
 after(async () => {
     await rm(tempRoot, { recursive: true, force: true });
 });
@@ -46,4 +53,15 @@ test("Alibbit abstract image models resolve to concrete provider model IDs", asy
     assert.equal(resolveAlibbitModelId({ model: "alibbit-banana2", quality: "medium", resolution: "1k", size: "1:1" }), "ali-banana2-1:1-1k");
     assert.equal(resolveAlibbitModelId({ model: "alibbit-gptimage2", quality: "high", resolution: "4k", size: "16:9" }), "ali-gptimage2-16:9-4k");
     assert.equal(resolveAlibbitModelId({ model: "alibbit-gptimage2", quality: "high", resolution: "4k", size: "auto" }), "ali-gptimage2-auto-2k");
+});
+
+test("KIE Gemini Omni Video is available as a built-in video model", async () => {
+    const { getBuiltinModelProfile } = await importModelProfiles();
+
+    assert.deepEqual(getBuiltinModelProfile("gemini-omni-video"), {
+        id: "gemini-omni-video",
+        label: "KIE Gemini Omni Video",
+        provider: "kie",
+        capabilities: ["video"],
+    });
 });

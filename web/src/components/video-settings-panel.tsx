@@ -5,7 +5,7 @@ import { ImageSettingsTheme } from "@/components/image-settings-panel";
 import { boolConfig, isSeedanceFastModel, isSeedanceVideoConfig, normalizeKieSeedanceResolution, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceDurationOptions, seedancePixelLabel, seedanceRatioOptions, seedanceResolutionOptionsForModel } from "@/lib/seedance-video";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
-import { getVideoModelProfile, type VideoSettingField } from "@/services/ai/video-model-profiles";
+import { getVideoModelProfile, videoClipValidationMessage, type VideoSettingField } from "@/services/ai/video-model-profiles";
 
 const resolutionOptions = [
     { value: "720", label: "720p" },
@@ -29,7 +29,7 @@ export const videoSecondOptions = secondOptions.map((value) => String(value));
 
 type VideoSettingsPanelProps = {
     config: AiConfig;
-    onConfigChange: (key: "vquality" | "size" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark" | "videoMode" | "videoCharacterOrientation" | "videoBackgroundSource", value: string) => void;
+    onConfigChange: (key: "vquality" | "size" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark" | "videoMode" | "videoCharacterOrientation" | "videoBackgroundSource" | "videoSeed" | "videoClipStart" | "videoClipEnd", value: string) => void;
     theme: CanvasTheme;
     showTitle?: boolean;
     className?: string;
@@ -40,6 +40,9 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
     const profile = getVideoModelProfile(modelOptionName(requestConfig.model || requestConfig.videoModel), requestConfig.apiFormat);
     if (profile.task === "motion-control") {
         return <MotionControlVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} fields={profile.fields} />;
+    }
+    if (profile.task === "multimodal-video") {
+        return <GeminiOmniVideoSettingsPanel config={requestConfig} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} fields={profile.fields} />;
     }
     if (isSeedanceVideoConfig(config)) {
         return <SeedanceVideoSettingsPanel config={requestConfig} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} fields={profile.fields} />;
@@ -167,6 +170,60 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
     );
 }
 
+function GeminiOmniVideoSettingsPanel({ config, onConfigChange, theme, showTitle, className, fields }: VideoSettingsPanelProps & { fields: VideoSettingField[] }) {
+    const options = (key: VideoSettingField["key"]) => fields.find((field) => field.key === key)?.options || [];
+    const ratio = ["16:9", "9:16"].includes(config.size) ? config.size : "";
+    const resolution = ["720p", "1080p", "4k"].includes(config.vquality) ? config.vquality : "";
+    const duration = ["4", "6", "8", "10"].includes(config.videoSeconds) ? config.videoSeconds : "";
+    const seedField = fields.find((field) => field.key === "seed");
+    const clipStartField = fields.find((field) => field.key === "clip_start");
+    const clipEndField = fields.find((field) => field.key === "clip_end");
+    const clipError = videoClipValidationMessage(config.videoClipStart, config.videoClipEnd);
+
+    return (
+        <ImageSettingsTheme theme={theme}>
+            <div className={className} style={{ color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()}>
+                {showTitle ? <div className="text-sm font-semibold">视频设置</div> : null}
+                <SettingGroup title="分辨率（可选）" color={theme.node.muted}>
+                    <div className="grid grid-cols-3 gap-1.5">
+                        {options("vquality").map((item) => (
+                            <OptionPill key={item.value} selected={resolution === item.value} theme={theme} onClick={() => onConfigChange("vquality", item.value)}>
+                                {item.label}
+                            </OptionPill>
+                        ))}
+                    </div>
+                </SettingGroup>
+                <SettingGroup title="比例（可选）" color={theme.node.muted}>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {options("size").map((item) => (
+                            <PreviewButton key={item.value} selected={ratio === item.value} theme={theme} onClick={() => onConfigChange("size", item.value)} previewWidth={ratioPreview(item.value).width} previewHeight={ratioPreview(item.value).height} label={item.label} heightClass="h-[48px]" />
+                        ))}
+                    </div>
+                </SettingGroup>
+                <SettingGroup title="时长 *" color={theme.node.muted}>
+                    <div className="grid grid-cols-4 gap-1.5">
+                        {options("videoSeconds").map((item) => (
+                            <OptionPill key={item.value} selected={duration === item.value} theme={theme} onClick={() => onConfigChange("videoSeconds", item.value)}>
+                                {item.label}
+                            </OptionPill>
+                        ))}
+                    </div>
+                </SettingGroup>
+                <SettingGroup title={`视频裁剪${clipStartField?.requiredWhen === "video" ? "（有参考视频时必填）" : ""}`} color={theme.node.muted}>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        <LabeledNumberInput label="开始" value={config.videoClipStart} min={clipStartField?.min ?? 0} max={clipStartField?.max ?? 30} theme={theme} onChange={(value) => onConfigChange("videoClipStart", value)} />
+                        <LabeledNumberInput label="结束" value={config.videoClipEnd} min={clipEndField?.min ?? 0} max={clipEndField?.max ?? 30} theme={theme} onChange={(value) => onConfigChange("videoClipEnd", value)} />
+                    </div>
+                    {clipError ? <div role="alert" className="text-[10px] leading-4 text-red-500">{clipError}</div> : null}
+                </SettingGroup>
+                <SettingGroup title="Seed（可选）" color={theme.node.muted}>
+                    <NumberInput value={config.videoSeed} min={seedField?.min ?? 0} max={seedField?.max ?? 2147483647} theme={theme} onChange={(value) => onConfigChange("videoSeed", value)} />
+                </SettingGroup>
+            </div>
+        </ImageSettingsTheme>
+    );
+}
+
 function hasSeedanceField(fields: VideoSettingField[], key: VideoSettingField["key"]) {
     return fields.some((field) => field.key === key);
 }
@@ -188,6 +245,21 @@ export function videoSecondsLabel(value: string, allowSmart = true) {
     if (allowSmart && String(value).trim() === "-1") return "智能";
     if (String(value).trim() === "-1") return "5s";
     return `${value || "6"}s`;
+}
+
+export function videoSettingsSummary(config: AiConfig) {
+    const requestConfig = resolveModelRequestConfig(config, config.model || config.videoModel);
+    const profile = getVideoModelProfile(modelOptionName(requestConfig.model || requestConfig.videoModel), requestConfig.apiFormat);
+    if (profile.task === "motion-control") {
+        const selected = [config.videoMode, config.videoCharacterOrientation, config.videoBackgroundSource].filter(Boolean).length;
+        return `动作控制 · ${selected}/${profile.fields.length}`;
+    }
+    if (profile.task === "multimodal-video") {
+        const resolution = ["720p", "1080p", "4k"].includes(config.vquality) ? videoResolutionLabel(config.vquality) : "默认分辨率";
+        const ratio = ["16:9", "9:16"].includes(config.size) ? config.size : "默认比例";
+        return `${resolution} · ${ratio} · ${videoSecondsLabel(config.videoSeconds, false)}`;
+    }
+    return `${videoResolutionLabel(config.vquality)} · ${videoSizeLabel(config.size)} · ${videoSecondsLabel(config.videoSeconds, requestConfig.apiFormat !== "kie")}`;
 }
 
 export function normalizeVideoSizeValue(value: string) {
@@ -306,7 +378,16 @@ function DimensionInput({ prefix, value, disabled, theme, onChange }: { prefix: 
 }
 
 function NumberInput({ value, min, max, theme, onChange }: { value: string; min: number; max: number; theme: CanvasTheme; onChange: (value: string) => void }) {
-    return <input type="number" min={min} max={max} className="h-7 rounded-md border bg-transparent px-3 text-center text-xs outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" style={{ borderColor: theme.node.stroke, color: theme.node.text, WebkitTextFillColor: theme.node.text }} value={value} onChange={(event) => onChange(event.target.value)} onMouseDown={(event) => event.stopPropagation()} />;
+    return <input type="number" min={min} max={max} className="h-7 w-full rounded-md border bg-transparent px-3 text-center text-xs outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" style={{ borderColor: theme.node.stroke, color: theme.node.text, WebkitTextFillColor: theme.node.text }} value={value} onChange={(event) => onChange(event.target.value)} onMouseDown={(event) => event.stopPropagation()} />;
+}
+
+function LabeledNumberInput({ label, value, min, max, theme, onChange }: { label: string; value: string; min: number; max: number; theme: CanvasTheme; onChange: (value: string) => void }) {
+    return (
+        <label className="grid gap-1 text-[10px]" style={{ color: theme.node.placeholder }}>
+            <span>{label}</span>
+            <NumberInput value={value} min={min} max={max} theme={theme} onChange={onChange} />
+        </label>
+    );
 }
 
 function SizePreview({ width, height, color }: { width: number; height: number; color: string }) {

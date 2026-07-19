@@ -8,6 +8,7 @@ import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { resolveProviderAspectRatio } from "../image-settings";
+import { isKieGeminiOmniVideoModel, validateVideoModelInputs } from "../video-model-profiles";
 import { providerHeaders, readProviderError, runAsyncTask, type RequestOptions } from "../media-task-runtime";
 import { buildKieVideoTaskBody } from "./kie-video-payload";
 import type { GeneratedImage } from "./alibbit-provider";
@@ -57,13 +58,28 @@ export async function requestKieImages(config: AiConfig, prompt: string, referen
 
 export async function requestKieVideo(config: AiConfig, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<GeneratedVideo> {
     try {
+        const errors = validateVideoModelInputs(config, {
+            prompt,
+            imageCount: references.length,
+            videoCount: videoReferences.length,
+            audioCount: audioReferences.length,
+            imageBytes: references.map((item) => item.bytes),
+            videoBytes: videoReferences.map((item) => item.bytes),
+            videoDurationsMs: videoReferences.map((item) => item.durationMs),
+        });
+        if (errors.length) throw new Error(errors[0]);
         const imageUrls = await Promise.all(references.map((image) => uploadKieImageReference(config, image, options)));
         const videoUrls = await Promise.all(videoReferences.map((video) => uploadKieMediaReference(config, video, "video", options)));
         const audioUrls = await Promise.all(audioReferences.map((audio) => uploadKieMediaReference(config, audio, "audio", options)));
+        const body = buildKieVideoTaskBody(config, prompt, imageUrls, videoUrls, audioUrls);
+        if (isKieGeminiOmniVideoModel(config.model)) {
+            await captureKieRequestPreview(body);
+            throw new Error(`KIE 请求已拦截，等待核对：\n${JSON.stringify(body, null, 2)}`);
+        }
         const result = await runAsyncTask(
             config,
             kieTaskProfile,
-            buildKieVideoTaskBody(config, prompt, imageUrls, videoUrls, audioUrls),
+            body,
             options,
         );
         const url = result.urls[0];
@@ -72,6 +88,15 @@ export async function requestKieVideo(config: AiConfig, prompt: string, referenc
     } catch (error) {
         throw new Error(readProviderError(error, "KIE 视频生成失败"));
     }
+}
+
+async function captureKieRequestPreview(body: unknown) {
+    const response = await fetch("/__debug/kie-request-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error("KIE 请求预检快照保存失败");
 }
 
 async function uploadKieImageReference(config: AiConfig, image: ReferenceImage, options?: RequestOptions) {

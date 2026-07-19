@@ -17,6 +17,7 @@
 
 - [本地开发](/docs/development/local-development)
 - [画布数据结构](/docs/development/canvas-data-structure)
+- [新模型 / 新渠道接入指引](/docs/development/provider-model-integration)
 
 ## 商务合作
 
